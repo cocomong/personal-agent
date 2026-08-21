@@ -1,0 +1,24 @@
+{
+  "name": "personal-agent-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Thin backend relay that bridges text chat to an ElevenLabs agent over its conversational WebSocket, for the Construction PM Assistant.",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/"
+  },
+  "dependencies": {
+    "hono": "^4.4.0",
+    "@hono/node-server": "^1.11.0",
+    "ws": "^8.17.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.3.0",
+    "tsx": "^4.10.0",
+    "@types/ws": "^8.5.10",
+    "@biomejs/biome": "^1.8.0"
+  }
+}

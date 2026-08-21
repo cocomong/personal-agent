@@ -1,0 +1,7 @@
+.dart_tool/
+.packages
+build/
+flutter_export_environment.sh
+*.iml
+.idea/
+.vscode/

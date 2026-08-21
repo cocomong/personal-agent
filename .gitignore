@@ -1,0 +1,30 @@
+node_modules/
+public/
+
+# secrets and errors
+.env
+.log
+
+# cache dir for eleventy-cache-assets
+.cache
+
+# Local Netlify folder
+.netlify
+
+# macOS related files
+.DS_Store
+
+#local vscode settings
+.vscode
+
+#oh my opencode directory
+.omo
+
+#playwright directory
+.playwright-mcp
+
+.planning
+
+#dev works/note
+flyer
+notes

@@ -1,0 +1,271 @@
+{
+  "name": "Customer Approval Portal",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "approve-estimate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ap-01",
+      "name": "Estimate Approval Page",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 100]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT p.id, p.title, p.baseline_status, p.baseline_approval_token AS token, e.division_code, e.scope_description, e.allocated_amount FROM projects p LEFT JOIN estimates e ON e.project_id = p.id WHERE p.baseline_approval_token::text = $1 ORDER BY e.division_code;",
+        "options": {
+          "queryReplacement": "={{ [$json.query.token] }}"
+        }
+      },
+      "id": "ap-02",
+      "name": "Estimate Approval Lookup",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 100],
+      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst proj = rows[0] || {};\nconst total = rows.reduce((s, r) => s + Number(r.allocated_amount ?? 0), 0);\nconst lines = rows.filter(r => r.division_code).map(r => `<tr><td>${r.division_code ?? ''}</td><td>${r.scope_description ?? ''}</td><td>$${Number(r.allocated_amount ?? 0).toLocaleString('en-US')}</td></tr>`).join('');\nconst form = `<form method='POST' action='/webhook/estimate/approval'><input type='hidden' name='token' value='${proj.token ?? ''}'><input type='hidden' name='approval_method' value='onsite_link'><input type='text' name='signer_name' placeholder='Type your full name' required><br><button class='btn approve' name='decision' value='approve'>Approve</button><button class='btn reject' name='decision' value='reject'>Reject</button></form>`;\nconst html = `<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Approve Estimate</title><style>body{font-family:Helvetica,Arial,sans-serif;color:#1e293b;margin:2rem;max-width:640px}h1{font-size:1.4rem;color:#2563eb}table{width:100%;border-collapse:collapse}td,th{padding:.5rem;border-bottom:1px solid #e2e8f0;text-align:left}.total{font-size:1.3rem;font-weight:700;margin-top:1rem}input[type=text]{width:100%;padding:.6rem;margin:1rem 0;font-size:1rem;box-sizing:border-box}.btn{padding:.7rem 1.2rem;border:none;border-radius:6px;font-size:1rem;cursor:pointer;margin-right:.5rem}.approve{background:#16a34a;color:#fff}.reject{background:#dc2626;color:#fff}</style></head><body><h1>Baseline Estimate — ${proj.title ?? ''}</h1>${proj.baseline_status === 'PENDING' ? `<table><tr><th>Division</th><th>Scope</th><th>Amount</th></tr>${lines}</table><div class='total'>Total: $${total.toLocaleString('en-US')}</div>${form}` : `<p>This baseline estimate is already ${(proj.baseline_status ?? '').toLowerCase()}.</p>`}</body></html>`;\nreturn [{ json: { html } }];"
+      },
+      "id": "ap-03",
+      "name": "Estimate Approval Render",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              { "name": "Content-Type", "value": "text/html; charset=utf-8" }
+            ]
+          }
+        }
+      },
+      "id": "ap-04",
+      "name": "Estimate Approval Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [960, 100]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/estimate/approval",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ap-05",
+      "name": "Estimate Approval Action",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH proj AS (SELECT id FROM projects WHERE baseline_approval_token::text = $1 AND baseline_status = 'PENDING' FOR UPDATE), approved AS (UPDATE projects p SET baseline_status = CASE WHEN $2 = 'approve' THEN 'APPROVED' ELSE 'REJECTED' END, baseline_approved_at = CASE WHEN $2 = 'approve' THEN now() ELSE NULL END, baseline_approved_by = 'customer', baseline_approval_method = $3, baseline_signer_name = $4, original_contract_value = CASE WHEN $2 = 'approve' THEN (SELECT COALESCE(SUM(allocated_amount), 0.00) FROM estimates e WHERE e.project_id = p.id) ELSE p.original_contract_value END, revised_contract_value = CASE WHEN $2 = 'approve' THEN (SELECT COALESCE(SUM(allocated_amount), 0.00) FROM estimates e WHERE e.project_id = p.id) ELSE p.revised_contract_value END FROM proj WHERE p.id = proj.id RETURNING p.id, p.title, p.original_contract_value, p.revised_contract_value, p.baseline_status) SELECT * FROM approved;",
+        "options": {
+          "queryReplacement": "={{ [$json.body.token, $json.body.decision, ($json.body.approval_method ?? 'onsite_link'), ($json.body.signer_name ?? '')] }}"
+        }
+      },
+      "id": "ap-06",
+      "name": "Estimate Approval Update",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 300],
+      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first()?.json;\nconst ok = r && r.baseline_status === 'APPROVED';\nconst html = `<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>${ok ? 'Approved' : 'Decision recorded'}</title><style>body{font-family:Helvetica,Arial,sans-serif;color:#1e293b;margin:2rem;text-align:center}.ok{color:#16a34a;font-size:1.5rem;font-weight:700}.no{color:#dc2626;font-size:1.5rem;font-weight:700}</style></head><body><div class='${ok ? 'ok' : 'no'}'>${ok ? 'Approved' : 'Decision recorded'}</div><p>${r?.title ?? ''}</p>${ok ? `<p>Revised contract: $${Number(r.revised_contract_value ?? 0).toLocaleString('en-US')}</p>` : ''}</body></html>`;\nreturn [{ json: { html } }];"
+      },
+      "id": "ap-07",
+      "name": "Estimate Approval Confirm",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              { "name": "Content-Type", "value": "text/html; charset=utf-8" }
+            ]
+          }
+        }
+      },
+      "id": "ap-08",
+      "name": "Estimate Approval Confirm Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "approve-change-order",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ap-09",
+      "name": "Change Order Approval Page",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT co.id, co.change_order_number, co.description, co.cost_impact, co.approval_status, co.approval_token AS token, p.title AS project_name FROM change_orders co JOIN projects p ON p.id = co.project_id WHERE co.approval_token::text = $1 LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [$json.query.token] }}"
+        }
+      },
+      "id": "ap-10",
+      "name": "Change Order Approval Lookup",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 500],
+      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const co = $input.first()?.json;\nconst amount = Number(co?.cost_impact ?? 0);\nconst sign = amount >= 0 ? '+' : '';\nconst form = `<form method='POST' action='/webhook/change-order/approval'><input type='hidden' name='token' value='${co?.token ?? ''}'><input type='hidden' name='approval_method' value='onsite_link'><input type='text' name='signer_name' placeholder='Type your full name' required><br><button class='btn approve' name='decision' value='approve'>Approve</button><button class='btn reject' name='decision' value='reject'>Reject</button></form>`;\nconst html = `<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Approve Change Order</title><style>body{font-family:Helvetica,Arial,sans-serif;color:#1e293b;margin:2rem;max-width:640px}h1{font-size:1.4rem;color:#2563eb}.amount{font-size:1.6rem;font-weight:700}.row{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid #e2e8f0}input[type=text]{width:100%;padding:.6rem;margin:1rem 0;font-size:1rem;box-sizing:border-box}.btn{padding:.7rem 1.2rem;border:none;border-radius:6px;font-size:1rem;cursor:pointer;margin-right:.5rem}.approve{background:#16a34a;color:#fff}.reject{background:#dc2626;color:#fff}</style></head><body><h1>Change Order #${co?.change_order_number ?? ''} — ${co?.project_name ?? ''}</h1><div class='row'><span>Description</span><span>${co?.description ?? ''}</span></div><div class='row'><span>Impact</span><span class='amount'>${sign}$${Math.abs(amount).toLocaleString('en-US')}</span></div>${co?.approval_status === 'PENDING' ? form : `<p>This change order is already ${(co?.approval_status ?? '').toLowerCase()}.</p>`}</body></html>`;\nreturn [{ json: { html } }];"
+      },
+      "id": "ap-11",
+      "name": "Change Order Approval Render",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              { "name": "Content-Type", "value": "text/html; charset=utf-8" }
+            ]
+          }
+        }
+      },
+      "id": "ap-12",
+      "name": "Change Order Approval Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [960, 500]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/change-order/approval",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ap-13",
+      "name": "Change Order Approval Action",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 700]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH co AS (SELECT id, project_id FROM change_orders WHERE approval_token::text = $1 AND approval_status = 'PENDING' FOR UPDATE), decided AS (UPDATE change_orders c SET approval_status = CASE WHEN $2 = 'approve' THEN 'APPROVED' ELSE 'REJECTED' END, approved_at = CASE WHEN $2 = 'approve' THEN now() ELSE NULL END, approved_by = 'customer', approval_method = $3, signer_name = $4 FROM co WHERE c.id = co.id RETURNING c.project_id, c.change_order_number, c.cost_impact, c.approval_status), recalc AS (UPDATE projects p SET revised_contract_value = p.original_contract_value + (SELECT COALESCE(SUM(c2.cost_impact), 0.00) FROM change_orders c2 WHERE c2.project_id = p.id AND c2.approval_status = 'APPROVED') + (SELECT COALESCE(SUM(d.cost_impact), 0.00) FROM decided d WHERE d.project_id = p.id AND d.approval_status = 'APPROVED') WHERE p.id IN (SELECT project_id FROM decided) RETURNING p.id, p.title, p.revised_contract_value) SELECT d.change_order_number, d.cost_impact, d.approval_status, r.title, r.revised_contract_value FROM decided d JOIN recalc r ON r.id = d.project_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.body.token, $json.body.decision, ($json.body.approval_method ?? 'onsite_link'), ($json.body.signer_name ?? '')] }}"
+        }
+      },
+      "id": "ap-14",
+      "name": "Change Order Approval Update",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 700],
+      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first()?.json;\nconst ok = r && r.approval_status === 'APPROVED';\nconst html = `<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>${ok ? 'Approved' : 'Decision recorded'}</title><style>body{font-family:Helvetica,Arial,sans-serif;color:#1e293b;margin:2rem;text-align:center}.ok{color:#16a34a;font-size:1.5rem;font-weight:700}.no{color:#dc2626;font-size:1.5rem;font-weight:700}</style></head><body><div class='${ok ? 'ok' : 'no'}'>${ok ? 'Approved' : 'Decision recorded'}</div><p>Change order #${r?.change_order_number ?? ''} — ${r?.title ?? ''}</p>${ok ? `<p>Revised contract: $${Number(r.revised_contract_value ?? 0).toLocaleString('en-US')}</p>` : ''}</body></html>`;\nreturn [{ json: { html } }];"
+      },
+      "id": "ap-15",
+      "name": "Change Order Approval Confirm",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 700]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              { "name": "Content-Type", "value": "text/html; charset=utf-8" }
+            ]
+          }
+        }
+      },
+      "id": "ap-16",
+      "name": "Change Order Approval Confirm Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [960, 700]
+    }
+  ],
+  "connections": {
+    "Estimate Approval Page": {
+      "main": [[{ "node": "Estimate Approval Lookup", "type": "main", "index": 0 }]]
+    },
+    "Estimate Approval Lookup": {
+      "main": [[{ "node": "Estimate Approval Render", "type": "main", "index": 0 }]]
+    },
+    "Estimate Approval Render": {
+      "main": [[{ "node": "Estimate Approval Respond", "type": "main", "index": 0 }]]
+    },
+    "Estimate Approval Action": {
+      "main": [[{ "node": "Estimate Approval Update", "type": "main", "index": 0 }]]
+    },
+    "Estimate Approval Update": {
+      "main": [[{ "node": "Estimate Approval Confirm", "type": "main", "index": 0 }]]
+    },
+    "Estimate Approval Confirm": {
+      "main": [[{ "node": "Estimate Approval Confirm Respond", "type": "main", "index": 0 }]]
+    },
+    "Change Order Approval Page": {
+      "main": [[{ "node": "Change Order Approval Lookup", "type": "main", "index": 0 }]]
+    },
+    "Change Order Approval Lookup": {
+      "main": [[{ "node": "Change Order Approval Render", "type": "main", "index": 0 }]]
+    },
+    "Change Order Approval Render": {
+      "main": [[{ "node": "Change Order Approval Respond", "type": "main", "index": 0 }]]
+    },
+    "Change Order Approval Action": {
+      "main": [[{ "node": "Change Order Approval Update", "type": "main", "index": 0 }]]
+    },
+    "Change Order Approval Update": {
+      "main": [[{ "node": "Change Order Approval Confirm", "type": "main", "index": 0 }]]
+    },
+    "Change Order Approval Confirm": {
+      "main": [[{ "node": "Change Order Approval Confirm Respond", "type": "main", "index": 0 }]]
+    }
+  }
+}
