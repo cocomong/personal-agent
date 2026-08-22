@@ -33,13 +33,20 @@ Routes on Vapi tool-calls (Vapi sends `message.toolCalls[0].{id, function:{name,
 | `create_estimate` | `Exec: create_estimate` — insert base estimate |
 | `create_change_order` | `Exec: create_change_order` — insert CO + auto-number (ADR-3 `tool_call_id`) |
 | `log_timesheet` | `Exec: log_timesheet` — insert hours (ADR-3 `tool_call_id`) |
-| `create_invoice` | `Exec: create_invoice` — SQL computes `revised_contract_value * pct%` (ADR-2) |
-| `send_customer_invoice` | `send_customer_invoice_lookup` (DB) → `send_customer_invoice_email` (SendGrid) |
+| `create_invoice` | `Exec: create_invoice` — SQL computes net + GST (+PST if `pst_applicable`) from `company_profile` (ADR-2) |
+| `send_customer_invoice` | `send_customer_invoice_lookup` (DB) → `Render Invoice HTML` (branded) → `send_customer_invoice_email` (Gmail) |
 | `get_project_statement` | `Exec: get_project_statement` — rollup view query |
 | `get_estimate_approval_link` | `Exec: get_estimate_approval_link` — return baseline approval token |
 | `get_change_order_approval_link` | `Exec: get_change_order_approval_link` — return CO approval token |
 | `send_estimate_for_approval` | `send_estimate_for_approval_lookup` (DB) → `Render Estimate Approval Email` → `send_estimate_for_approval_email` (Gmail) |
 | `send_change_order_for_approval` | `send_change_order_for_approval_lookup` (DB) → `Render Change Order Approval Email` → `send_change_order_for_approval_email` (Gmail) |
+| `record_payment` | `Exec: record_payment` (insert payment, ADR-3 `tool_call_id`) → `Exec: record_payment_status` (recompute status + balance) |
+| `run_payroll` | `Exec: run_payroll` — calls `fn_run_payroll($1,$2)` (aggregates timesheets, CPP/EI/WCB from `company_profile`) |
+| `get_payroll_summary` | `Exec: get_payroll_summary` — `view_payroll_summary` query |
+| `add_worker` | `Exec: add_worker` — upsert `workers` (auto `W-###` code) |
+| `get_dashboard_summary` | `Exec: get_dashboard_summary` — `view_project_financial_summary` (one or all projects) |
+
+> **Branding is configurable, not hardcoded.** Company name/address/phone/colors/signature live in the `company_profile` table (single row, `db/0007`). The gateway's email-render Code nodes read those fields via a `CROSS JOIN company_profile`. The deployment URL is read from `$env.PUBLIC_BASE_URL` (n8n env var) — see `DEPLOY.md`.
 
 > The gateway's `Normalize Tool Call` node maps Vapi's `message.toolCalls[0].function` payload to a canonical `{ toolCallId, action, arguments }` shape before the actions sub-router. Apply Vapi's actual field nesting (`function.name` / `function.arguments`) in that mapping.
 
@@ -91,8 +98,9 @@ A second workflow (`n8n/workflows/approval-portal.json`) hosts the **customer-fa
 - Signer name is captured as typed-name e-signature (`signer_name` / `baseline_signer_name`).
 
 ## Open items (build after scaffold)
-- [ ] Apply `db/0001_init.sql` to Supabase; optionally load `db/0003_seed.sql` and run `db/0002_idempotency_test.sql`.
+- [ ] Apply `db/0001`–`0011` to Supabase; optionally load `db/0003_seed.sql` + `db/0012_seed_v2.sql` and run `db/0002_idempotency_test.sql` + `db/0013_verification.sql`.
 - [ ] Point the gateway's tool-call webhook at the real n8n URL and map Vapi's exact `message.toolCalls[0].function` shape in `Normalize Tool Call`.
-- [ ] Build the Vapi assistant (voice provider='11labs') per `VAPI_ASSISTANT.md` and confirm same-session voice+text on a device.
+- [ ] Build the Vapi assistant (voice provider='11labs') per `VAPI_ASSISTANT.md`, add the 17 tools (`backend/vapi_tools_additions.json` has the 5 new ones), and confirm same-session voice+text on a device.
 - [ ] Move the hard-coded `Supabase PostgreSQL` / SendGrid credential ids to real n8n credentials.
-- [ ] (Optional) Upgrade `send_customer_invoice` from HTML email body to a PDF attachment.
+- [ ] Import the 3 scheduled workflows (overdue / quote-follow-up / payroll digest) and activate.
+- [ ] (Optional) Upgrade `send_customer_invoice` from HTML email body to a PDF attachment (n8n HTML→PDF node).

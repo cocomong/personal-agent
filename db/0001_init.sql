@@ -51,11 +51,23 @@ CREATE TABLE change_orders (
     created_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. TIMESHEETS (payroll & job costing)
+-- 5. WORKERS (payroll & job costing; timesheets reference workers by id)
+CREATE TABLE workers (
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    worker_code   VARCHAR(20) UNIQUE,               -- W-001 style (Sheets parity)
+    name          VARCHAR(255) NOT NULL,
+    trade         VARCHAR(100),                     -- Framer / Electrician / Labourer...
+    hourly_rate   NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    overtime_rate NUMERIC(10,2),                    -- NULL -> hourly_rate * 1.5
+    active        BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. TIMESHEETS (payroll & job costing)
 CREATE TABLE timesheets (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id       UUID REFERENCES projects(id) ON DELETE CASCADE,
-    worker_name      VARCHAR(255) NOT NULL,
+    worker_id        UUID NOT NULL REFERENCES workers(id) ON DELETE RESTRICT,
     hours_worked     NUMERIC(5,2) NOT NULL,
     work_description TEXT,
     date_worked      DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -63,7 +75,7 @@ CREATE TABLE timesheets (
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. INVOICES (billings referencing estimate progress or change orders)
+-- 7. INVOICES (billings referencing estimate progress or change orders)
 CREATE TABLE invoices (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id      UUID REFERENCES projects(id) ON DELETE CASCADE,
@@ -77,7 +89,7 @@ CREATE TABLE invoices (
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 7. INVOICE LINE ITEMS (link invoices to estimate_progress or change_order sources)
+-- 8. INVOICE LINE ITEMS (link invoices to estimate_progress or change_order sources)
 CREATE TABLE invoice_line_items (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     invoice_id  UUID REFERENCES invoices(id) ON DELETE CASCADE,
@@ -92,6 +104,7 @@ CREATE INDEX idx_projects_customer ON projects(customer_id);
 CREATE INDEX idx_estimates_project ON estimates(project_id);
 CREATE INDEX idx_change_orders_project ON change_orders(project_id);
 CREATE INDEX idx_timesheets_project ON timesheets(project_id);
+CREATE INDEX idx_timesheets_worker ON timesheets(worker_id);
 CREATE INDEX idx_invoices_project ON invoices(project_id);
 CREATE INDEX idx_invoice_line_items_invoice ON invoice_line_items(invoice_id);
 

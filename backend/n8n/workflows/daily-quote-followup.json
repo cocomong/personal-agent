@@ -1,0 +1,69 @@
+{
+  "name": "Daily Quote Follow-up",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 9 * * *" }
+          ]
+        }
+      },
+      "id": "qf-01",
+      "name": "Daily 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM view_quote_followups ORDER BY valid_until;",
+        "options": {}
+      },
+      "id": "qf-02",
+      "name": "Query Expired Quotes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 300],
+      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (!rows.length) return [];\nconst subject = `Quote follow-up: ${rows.length} expired quote(s)`;\nconst html = `<p>The following sent quotes have passed their validity date and still need a decision:</p><ul>${rows.map(r => `<li><strong>${r.project_name}</strong> (${r.customer_name}) — rev ${r.revision}, $${Number(r.amount).toLocaleString('en-CA')}, valid until ${r.valid_until}</li>`).join('')}</ul>`;\nreturn [{ json: { subject, html } }];"
+      },
+      "id": "qf-03",
+      "name": "Format Quote Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.GMAIL_USER }}",
+        "toEmail": "={{ $env.GMAIL_USER }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "qf-04",
+      "name": "Email Quote Follow-up",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [960, 300],
+      "credentials": { "smtp": { "id": "YOUR_GMAIL_SMTP_CREDENTIALS_ID", "name": "Gmail SMTP" } }
+    }
+  ],
+  "connections": {
+    "Daily 09:00": {
+      "main": [[{ "node": "Query Expired Quotes", "type": "main", "index": 0 }]]
+    },
+    "Query Expired Quotes": {
+      "main": [[{ "node": "Format Quote Email", "type": "main", "index": 0 }]]
+    },
+    "Format Quote Email": {
+      "main": [[{ "node": "Email Quote Follow-up", "type": "main", "index": 0 }]]
+    }
+  }
+}

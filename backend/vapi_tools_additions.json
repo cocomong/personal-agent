@@ -1,0 +1,102 @@
+{
+  "_note": "Five NEW Vapi function tools added by the Construction Ops migration (doc/MIGRATION_PLAN.md). All point at POST https://n8n2.ordrnow.com/webhook/voice/gateway. The 4 tools with *updated* params are listed at the bottom.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "record_payment",
+        "description": "Records a payment received against an invoice and updates the invoice status.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "invoice_number": { "type": "string", "description": "Invoice number, e.g. INV-1002" },
+            "amount": { "type": "number", "description": "Payment amount received" },
+            "payment_date": { "type": "string", "description": "Date received (YYYY-MM-DD); defaults to today" },
+            "method": { "type": "string", "enum": ["E-transfer", "Cheque", "Credit card", "Cash", "Other"] }
+          },
+          "required": ["invoice_number", "amount"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "run_payroll",
+        "description": "Computes payroll for the current (or given) period from logged timesheets and worker rates.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "period_end": { "type": "string", "description": "Payroll period end date (YYYY-MM-DD); defaults to end of the current month" },
+            "days": { "type": "number", "description": "Period length in days; defaults to the company payroll_period (monthly by default)" }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_payroll_summary",
+        "description": "Returns the most recent (or a specific period's) payroll run summary.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "period_end": { "type": "string", "description": "Period end date (YYYY-MM-DD); omit for the latest run" }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "add_worker",
+        "description": "Adds or updates a worker (name, trade, hourly and overtime rates).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "description": "Full worker name" },
+            "trade": { "type": "string", "description": "Trade, e.g. Framer, Electrician" },
+            "hourly_rate": { "type": "number", "description": "Hourly rate in dollars" },
+            "overtime_rate": { "type": "number", "description": "Overtime rate (defaults to 1.5x hourly)" },
+            "worker_code": { "type": "string", "description": "Optional short code; auto-generated W-### if omitted" }
+          },
+          "required": ["name", "hourly_rate"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_dashboard_summary",
+        "description": "Returns the financial dashboard for one project or all projects (contract, paid, balance, labor, margin).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "project_id": { "type": "string", "description": "Optional project name or ID; omit for all projects" }
+          }
+        }
+      }
+    }
+  ],
+  "updated_tools": [
+    {
+      "name": "create_invoice",
+      "added_param": { "pst_applicable": { "type": "boolean", "description": "Apply PST (7%) in addition to GST; default false" } }
+    },
+    {
+      "name": "create_change_order",
+      "added_param": { "reason": { "type": "string", "enum": ["client_change", "site_condition", "owner_directed", "other"], "description": "Reason for the change" } }
+    },
+    {
+      "name": "create_estimate",
+      "added_params": {
+        "revision": { "type": "number", "description": "Quote revision number; default 1" },
+        "status": { "type": "string", "enum": ["DRAFT", "SENT", "ACCEPTED", "DECLINED", "SUPERSEDED"], "description": "Quote status; default ACCEPTED" },
+        "valid_until": { "type": "string", "description": "Quote validity date (YYYY-MM-DD)" }
+      }
+    },
+    {
+      "name": "log_timesheet",
+      "added_param": { "overtime_hours": { "type": "number", "description": "Overtime hours logged; default 0" } }
+    }
+  ]
+}

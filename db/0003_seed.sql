@@ -41,18 +41,31 @@ AND NOT EXISTS (
     WHERE p2.title = 'Oakridge Build' AND co.change_order_number = 1
 );
 
--- Timesheet for Oakridge
-INSERT INTO timesheets (project_id, worker_name, hours_worked, work_description, date_worked)
-SELECT p.id, 'Mark Johnson', 8.0, 'Framing day work', CURRENT_DATE
-FROM projects p WHERE p.title = 'Oakridge Build'
+-- Workers (registry — timesheets reference workers by worker_id)
+INSERT INTO workers (worker_code, name, trade, hourly_rate, overtime_rate)
+SELECT 'W-001', 'Mike Johnson', 'Framer', 38.00, 57.00
+WHERE NOT EXISTS (SELECT 1 FROM workers WHERE worker_code = 'W-001');
+
+INSERT INTO workers (worker_code, name, trade, hourly_rate)
+SELECT 'W-002', 'Ravi Patel', 'Electrician', 45.00
+WHERE NOT EXISTS (SELECT 1 FROM workers WHERE worker_code = 'W-002');
+
+-- Timesheet for Oakridge (references worker W-001)
+INSERT INTO timesheets (project_id, worker_id, hours_worked, work_description, date_worked)
+SELECT p.id, (SELECT id FROM workers WHERE worker_code = 'W-001'), 8.0, 'Framing day work', CURRENT_DATE
+FROM projects p
+WHERE p.title = 'Oakridge Build'
 AND NOT EXISTS (
     SELECT 1 FROM timesheets t JOIN projects p2 ON p2.id = t.project_id
-    WHERE p2.title = 'Oakridge Build' AND t.worker_name = 'Mark Johnson' AND t.date_worked = CURRENT_DATE
+    WHERE p2.title = 'Oakridge Build'
+      AND t.worker_id = (SELECT id FROM workers WHERE worker_code = 'W-001')
+      AND t.date_worked = CURRENT_DATE
 );
 
--- Draft invoice for Oakridge (progress billing 50% of revised contract)
-INSERT INTO invoices (project_id, invoice_number, invoice_type, amount_due, holdback_amount, status, issued_date, due_date)
+-- Draft invoice for Oakridge (progress billing 50% of revised contract, no tax)
+INSERT INTO invoices (project_id, invoice_number, invoice_type, net_amount, gst_amount, pst_amount, amount_due, holdback_amount, status, issued_date, due_date)
 SELECT p.id, 'INV-OAK-1001', 'PROGRESS_BILLING',
+       ROUND(p.revised_contract_value * 0.50, 2), 0.00, 0.00,
        ROUND(p.revised_contract_value * 0.50, 2), 0.00, 'DRAFT', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 day'
 FROM projects p WHERE p.title = 'Oakridge Build'
 AND NOT EXISTS (SELECT 1 FROM invoices WHERE invoice_number = 'INV-OAK-1001');

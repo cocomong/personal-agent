@@ -1,0 +1,69 @@
+{
+  "name": "Monthly Payroll Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 7 1 * *" }
+          ]
+        }
+      },
+      "id": "mp-01",
+      "name": "Monthly 1st 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM fn_run_payroll(NULL, NULL);",
+        "options": {}
+      },
+      "id": "mp-02",
+      "name": "Compute Payroll (month)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 300],
+      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first()?.json;\nif (!r) return [];\nconst subject = `Payroll draft: ${r.period_start} to ${r.period_end}`;\nconst html = `<p><strong>Payroll draft</strong> (${r.status}) for ${r.period_start} → ${r.period_end}:</p><ul><li>Workers: ${r.workers}</li><li>Regular hours: ${Number(r.regular_hours).toLocaleString()}</li><li>Overtime hours: ${Number(r.overtime_hours).toLocaleString()}</li><li>Gross pay: $${Number(r.gross_pay).toLocaleString('en-CA')}</li><li>Deductions (CPP/EI/WCB): $${Number(r.deductions).toLocaleString('en-CA')}</li><li>Net pay: $${Number(r.net_pay).toLocaleString('en-CA')}</li></ul><p>Review and approve this run (status is DRAFT).</p>`;\nreturn [{ json: { subject, html } }];"
+      },
+      "id": "mp-03",
+      "name": "Format Payroll Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.GMAIL_USER }}",
+        "toEmail": "={{ $env.GMAIL_USER }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "mp-04",
+      "name": "Email Payroll Digest",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [960, 300],
+      "credentials": { "smtp": { "id": "YOUR_GMAIL_SMTP_CREDENTIALS_ID", "name": "Gmail SMTP" } }
+    }
+  ],
+  "connections": {
+    "Monthly 1st 07:00": {
+      "main": [[{ "node": "Compute Payroll (month)", "type": "main", "index": 0 }]]
+    },
+    "Compute Payroll (month)": {
+      "main": [[{ "node": "Format Payroll Email", "type": "main", "index": 0 }]]
+    },
+    "Format Payroll Email": {
+      "main": [[{ "node": "Email Payroll Digest", "type": "main", "index": 0 }]]
+    }
+  }
+}

@@ -16,15 +16,18 @@ SELECT c.id, 'Idem Test Project', '123 Test St'
 FROM customers c
 WHERE c.email = 'idem-test@example.com';
 
+-- Fixture: a throwaway worker (rolled back at the end)
+INSERT INTO workers (worker_code, name, hourly_rate) VALUES ('W-IDEM', 'Idem Worker', 30.00);
+
 -- 1. TIMESHEETS idempotency: insert, then replay the SAME tool_call_id.
-INSERT INTO timesheets (project_id, worker_name, hours_worked, date_worked, tool_call_id)
-SELECT p.id, 'Mark', 8.0, CURRENT_DATE, 'call_timesheet_dup_1'
+INSERT INTO timesheets (project_id, worker_id, hours_worked, date_worked, tool_call_id)
+SELECT p.id, (SELECT id FROM workers WHERE worker_code = 'W-IDEM'), 8.0, CURRENT_DATE, 'call_timesheet_dup_1'
 FROM projects p JOIN customers c ON c.id = p.customer_id
 WHERE c.email = 'idem-test@example.com'
 ON CONFLICT (tool_call_id) DO NOTHING;
 
-INSERT INTO timesheets (project_id, worker_name, hours_worked, date_worked, tool_call_id)
-SELECT p.id, 'Mark', 8.0, CURRENT_DATE, 'call_timesheet_dup_1'
+INSERT INTO timesheets (project_id, worker_id, hours_worked, date_worked, tool_call_id)
+SELECT p.id, (SELECT id FROM workers WHERE worker_code = 'W-IDEM'), 8.0, CURRENT_DATE, 'call_timesheet_dup_1'
 FROM projects p JOIN customers c ON c.id = p.customer_id
 WHERE c.email = 'idem-test@example.com'
 ON CONFLICT (tool_call_id) DO NOTHING;

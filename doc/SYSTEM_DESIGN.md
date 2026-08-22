@@ -1,6 +1,6 @@
 # Voice AI & Construction Project Lifecycle Automation — System Design
 
-**Version:** 1.1 (distilled from `Construction Project Management Assistant(1).md`)
+**Version:** 1.3 (distilled from `Construction Project Management Assistant(1).md`; §13 documents the v1.3 Construction Ops migration)
 **Status:** Draft for review
 **Source:** Gemini session [`16811441e351d6d8`](https://gemini.google.com/app/16811441e351d6d8)
 
@@ -263,7 +263,7 @@ GROUP BY c.id, c.name;
 
 ## 4. Agent Tool Definitions (business actions)
 
-The 8 tools below are the **business actions** the agent can invoke. They are **Vapi function tools**. Each tool points at the **single unified n8n gateway** webhook (`POST /webhook/voice/gateway`); n8n dispatches on the function name against the shared business logic.
+The 17 tools below are the **business actions** the agent can invoke (12 original + 5 added in v1.3). They are **Vapi function tools**. Each tool points at the **single unified n8n gateway** webhook (`POST /webhook/voice/gateway`); n8n dispatches on the function name against the shared business logic.
 
 > **Voice-engine note.** The Vapi assistant's `voice.provider` is set to `'11labs'` (ElevenLabs) for high-quality TTS — this is a Vapi assistant setting, independent of the tool definitions. The `server.url` on each tool points to the n8n gateway, where Vapi POSTs the tool-call.
 
@@ -798,3 +798,30 @@ Because ElevenLabs is used only as Vapi's **voice/TTS provider** (`provider: '11
 - [ ] Choose accounting integration (QuickBooks Online / Xero / Gusto) for payroll + invoicing sync.
 - [ ] Select and lock the LLM model configured in the Vapi assistant.
 - [ ] Validate the rollup view naming: this design uses `allocated_amount`/`cost_impact`; reconcile with any existing sheet columns when migrating.
+
+---
+
+## 13. v1.3 — Construction Ops Migration (Ireh Construction)
+
+The v1.3 change set ports the proven capabilities of the Google Sheets "Construction Ops" tracker into this stack. Full detail in **`doc/MIGRATION_PLAN.md`**; the migration is implemented in `db/0007`–`0013` + the n8n workflow edits.
+
+### Company profile (branding as config)
+New single-row **`company_profile`** table (`db/0007`) is the single source of truth for branding and financial defaults — seeded with **Ireh Construction** (1951 Kaptey Ave, Coquitlam BC V3K 5Z7, 778-994-6602), brand colors, doc prefixes, and BC rates (GST 5%, PST 7%, retention 10%, CPP 5.95%, EI 1.63%, WCB 3.25%, monthly payroll). The n8n email/approval renderers read these via `CROSS JOIN company_profile` — no hardcoded strings remain.
+
+### New subsystems
+| # | Migration | Schema |
+|---|---|---|
+| 0001 + 0008 | Workers + payroll | `workers` (0001), `timesheets.worker_id` FK (0001), `payroll_runs`, `payroll_entries`, `fn_run_payroll()` (0008), `timesheets.overtime_hours` (0008) |
+| 0009 | Tax + payments | `invoices.net/gst/pst_amount` + `pst_applicable`, `payments`, `view_invoice_payments`, `recompute_invoice_status()` |
+| 0010 | Quote trail | `estimates.revision/status/valid_until/sent_at`, `change_orders.reason` |
+| 0011 | Dashboard views | `view_project_financial_summary` (tax-aware, ledger-driven, margin/retention/overdue), `view_payroll_summary`, `view_overdue_invoices`, `view_quote_followups` |
+
+### New voice tools (17 total)
+`record_payment`, `run_payroll`, `get_payroll_summary`, `add_worker`, `get_dashboard_summary` — plus updated params on `create_invoice` (`pst_applicable`), `create_change_order` (`reason`), `create_estimate` (`revision`/`status`/`valid_until`), `log_timesheet` (`overtime_hours`). JSON in `backend/vapi_tools_additions.json`.
+
+### New automation
+Three n8n Schedule Trigger workflows: `daily-overdue-check` (08:00), `daily-quote-followup` (09:00), `monthly-payroll-digest` (1st, 07:00).
+
+### Decisions (Dave, 2026-08-22)
+Branding = full legal name/address/phone (configurable) · GST always + PST per-invoice flag · n8n HTML→PDF (reportlab fallback) · **monthly** payroll, DRAFT → approve · all 5 new tools shipped.
+

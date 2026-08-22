@@ -1,0 +1,69 @@
+{
+  "name": "Daily Overdue Invoice Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 8 * * *" }
+          ]
+        }
+      },
+      "id": "oc-01",
+      "name": "Daily 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM view_overdue_invoices WHERE bucket IN ('OVERDUE','DUE_SOON') ORDER BY due_date;",
+        "options": {}
+      },
+      "id": "oc-02",
+      "name": "Query Overdue Invoices",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 300],
+      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (!rows.length) return [];\nconst subject = `Overdue invoice check: ${rows.length} item(s)`;\nconst html = `<p>The following invoices need attention:</p><ul>${rows.map(r => `<li><strong>${r.invoice_number}</strong> — ${r.project_name} (${r.customer_name}): ${r.status}, due ${r.due_date}, balance $${Number(r.balance_due).toLocaleString('en-CA')}</li>`).join('')}</ul>`;\nreturn [{ json: { subject, html } }];"
+      },
+      "id": "oc-03",
+      "name": "Format Overdue Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.GMAIL_USER }}",
+        "toEmail": "={{ $env.GMAIL_USER }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "oc-04",
+      "name": "Email Overdue Summary",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [960, 300],
+      "credentials": { "smtp": { "id": "YOUR_GMAIL_SMTP_CREDENTIALS_ID", "name": "Gmail SMTP" } }
+    }
+  ],
+  "connections": {
+    "Daily 08:00": {
+      "main": [[{ "node": "Query Overdue Invoices", "type": "main", "index": 0 }]]
+    },
+    "Query Overdue Invoices": {
+      "main": [[{ "node": "Format Overdue Email", "type": "main", "index": 0 }]]
+    },
+    "Format Overdue Email": {
+      "main": [[{ "node": "Email Overdue Summary", "type": "main", "index": 0 }]]
+    }
+  }
+}

@@ -9,8 +9,8 @@ Target assistant voice + text is **voice-primary, text-secondary** on the **same
 ## 1. Create the assistant
 
 1. Log in to the [Vapi dashboard](https://dashboard.vapi.ai) → **Assistants** → **Create Assistant**.
-2. Save it and note the **Assistant ID** (`YOUR_VAPI_ASSISTANT_ID`) and the **Public Key** (used in the mobile app `config.ts`).
-3. Copy the Assistant ID + Public Key into `mobile/src/config.ts`.
+2. Save it and note the **Assistant ID** (`YOUR_VAPI_ASSISTANT_ID`) and the **Public Key** (used in the mobile app `mobile-flutter/lib/config.dart`).
+3. Copy the Assistant ID + Public Key into `mobile-flutter/lib/config.dart`.
 
 ---
 
@@ -75,7 +75,7 @@ Configure each **server/function tool** from **Section 4** of `SYSTEM_DESIGN.md`
 - **Endpoint:** `POST https://<n8n>/webhook/voice/gateway`
 - **Auth:** include the n8n webhook auth header / secret as configured on the gateway.
 
-Define the `function` name, description, and JSON `parameters` per Section 4. Summary of the 8 tools:
+Define the `function` name, description, and JSON `parameters` per Section 4. Summary of the 17 tools (12 original + 5 new from the Construction Ops migration):
 
 | Function name | Description | Required params |
 |---|---|---|
@@ -83,7 +83,7 @@ Define the `function` name, description, and JSON `parameters` per Section 4. Su
 | `create_project` | Create a job site for a customer | `customer_id`, `project_name` |
 | `create_estimate` | Baseline scope quote (locked once approved) | `project_id`, `scope_description` |
 | `create_change_order` | Amendment — **never** for baseline scope | `project_id`, `description` |
-| `log_timesheet` | Log worker hours | `project_id`, `worker_name`, `hours_worked` |
+| `log_timesheet` | Log worker hours (worker matched by name/code/id) | `project_id`, `worker_name`, `hours_worked` |
 | `create_invoice` | Draft an invoice from progress/COs | `project_id`, `invoice_type` |
 | `send_customer_invoice` | Email the draft invoice to the client | `project_id`, `invoice_id` |
 | `get_project_statement` | Return the financial snapshot | `project_id` |
@@ -91,10 +91,17 @@ Define the `function` name, description, and JSON `parameters` per Section 4. Su
 | `get_change_order_approval_link` | Customer approval link for a change order | `project_id`, `change_order_number` |
 | `send_estimate_for_approval` | Email the baseline approval link to the client | `project_id` |
 | `send_change_order_for_approval` | Email a change order approval link to the client | `project_id`, `change_order_number` |
+| `record_payment` | Record a payment against an invoice | `invoice_number`, `amount` |
+| `run_payroll` | Compute payroll for a period from timesheets | — |
+| `get_payroll_summary` | Return the latest payroll run summary | — |
+| `add_worker` | Add/update a worker and rates | `name`, `hourly_rate` |
+| `get_dashboard_summary` | Financial dashboard for one/all projects | — |
+
+> The full JSON for the 5 new tools — and the added params on `create_invoice` (`pst_applicable`), `create_change_order` (`reason`), `create_estimate` (`revision`/`status`/`valid_until`), and `log_timesheet` (`overtime_hours`) — is in `backend/vapi_tools_additions.json`.
 
 > The `toolCallId` the assistant supplies on tool-calls must be echoed in the n8n `results[]` response so Vapi resolves the tool result to the right invocation (ADR-3 idempotency). The `tool_call_id` column in `db/0001_init.sql` makes inserts idempotent.
 
-> **Gateway coverage.** The n8n `voice-gateway.json` wires **all 8 tools** to backends: 7 PostgreSQL executors plus a SendGrid email step for `send_customer_invoice`. Financial calc for invoices happens in SQL (`revised_contract_value * billing_percentage/100`), per ADR-2.
+> **Gateway coverage.** The n8n `voice-gateway.json` wires **all 17 tools** to backends: 12 PostgreSQL executors, a `record_payment`→status recompute pair, a `run_payroll`/`get_payroll_summary` pair, and SendGrid/Gmail steps for the email tools. Financial calc for invoices and payroll happens in SQL (ADR-2), reading rates from `company_profile`.
 
 ---
 
@@ -108,11 +115,11 @@ Define the `function` name, description, and JSON `parameters` per Section 4. Su
 
 ## 7. Mobile SDK keys
 
-In `mobile/src/config.ts`:
+In `mobile-flutter/lib/config.dart`:
 
-```ts
-export const VAPI_PUBLIC_KEY = "<your_vapi_public_key>";
-export const VAPI_ASSISTANT_ID = "<your_assistant_id>";
+```dart
+const String vapiPublicKey = "<your_vapi_public_key>";
+const String vapiAssistantId = "<your_assistant_id>";
 ```
 
 The app creates `new Vapi(VAPI_PUBLIC_KEY)`, calls `start(ASSISTANT_ID)` for voice, and `send({type:'add-message', ...})` for same-session text.
@@ -121,12 +128,13 @@ The app creates `new Vapi(VAPI_PUBLIC_KEY)`, calls `start(ASSISTANT_ID)` for voi
 
 ## Checklist
 
-- [ ] Assistant created; ID + public key in `config.ts`
+- [ ] Assistant created; ID + public key in `mobile-flutter/lib/config.dart`
 - [ ] Voice provider = `11labs` (ADR-9)
 - [ ] Model chosen + locked
 - [ ] System prompt (Section 6) pasted
-- [ ] 8 function tools added, all → n8n `/voice/gateway`
+- [ ] 17 function tools added (12 original + 5 new), all → n8n `/voice/gateway`
 - [ ] n8n gateway deployed + webhook URL reachable from Vapi
-- [ ] DB migrated (`db/0001_init.sql`); test data loaded (`db/0003_seed.sql`);
-      idempotency verified (`db/0002_idempotency_test.sql`)
+- [ ] DB migrated (`db/0001` → `0011`); test data loaded (`db/0003_seed.sql` + `db/0012_seed_v2.sql`);
+      idempotency verified (`db/0002_idempotency_test.sql` + `db/0013_verification.sql`)
+- [ ] `company_profile` seeded with Ireh Construction branding + rates
 - [ ] Voice + text same-session tested on device
