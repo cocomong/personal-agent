@@ -23,6 +23,8 @@ docker compose up -d          # brings up n8n + postgres (co-located, same netwo
 
 `deploy/migrate.sh` runs the migrations in DEPLOY order via the postgres container's `psql` (no host dependencies), then runs the two self-rolling-back verification scripts. A clean run ends by printing the `company_profile` row (Ireh Construction).
 
+> **Moving Postgres to a separate VPS later?** No code changes — set `PGHOST`/`PGPORT`/`PGPASSWORD` (with a `psql` client installed) and `migrate.sh`/`backup.sh` switch to remote mode automatically. See the script headers for the full env surface.
+
 The migration set:
 
 1. `0001_init.sql` — 8 tables (incl. workers) + indexes + rollup view

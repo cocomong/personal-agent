@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# Apply the Construction PM Assistant migrations to the co-located Postgres.
-# Runs db/*.sql in DEPLOY order via the postgres container's psql (no host deps).
+# Apply the Construction PM Assistant migrations to Postgres.
+# Runs db/*.sql in DEPLOY order, then the two self-rolling-back verification
+# scripts. Works in two modes with zero edits:
 #
-# Usage:
-#   ./migrate.sh                        # default 'postgres' container/user/db
-#   POSTGRES_CONTAINER=my-pg ./migrate.sh
+#   Co-located (default) — run on the same host as the postgres container:
+#     ./migrate.sh
+#
+#   Remote — run against Postgres on another VPS (psql must be installed here):
+#     PGHOST=10.0.0.5 PGPASSWORD=... ./migrate.sh
+#
+# Env: POSTGRES_CONTAINER (default 'postgres'), POSTGRES_USER, POSTGRES_DB,
+#      PGHOST (set to go remote), PGPORT (default 5432), PGPASSWORD (remote).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,6 +18,12 @@ DB_DIR="$SCRIPT_DIR/../db"
 CONTAINER="${POSTGRES_CONTAINER:-postgres}"
 PGUSER="${POSTGRES_USER:-postgres}"
 PGDB="${POSTGRES_DB:-postgres}"
+
+if [[ -n "${PGHOST:-}" ]]; then
+  PSQL=(psql -h "$PGHOST" -p "${PGPORT:-5432}" -U "$PGUSER" -d "$PGDB")
+else
+  PSQL=(docker exec -i "$CONTAINER" psql -U "$PGUSER" -d "$PGDB")
+fi
 
 MIGRATIONS=(
   0001_init.sql
@@ -35,15 +47,15 @@ VERIFY=(
 echo "== Migrations =="
 for f in "${MIGRATIONS[@]}"; do
   echo "  applying $f"
-  docker exec -i "$CONTAINER" psql -U "$PGUSER" -d "$PGDB" -v ON_ERROR_STOP=1 -q < "$DB_DIR/$f"
+  "${PSQL[@]}" -v ON_ERROR_STOP=1 -q < "$DB_DIR/$f"
 done
 
 echo "== Verification (asserts then self-rolls-back) =="
 for f in "${VERIFY[@]}"; do
   echo "  running $f"
-  docker exec -i "$CONTAINER" psql -U "$PGUSER" -d "$PGDB" -v ON_ERROR_STOP=1 < "$DB_DIR/$f"
+  "${PSQL[@]}" -v ON_ERROR_STOP=1 < "$DB_DIR/$f"
 done
 
 echo "== Done =="
-docker exec -i "$CONTAINER" psql -U "$PGUSER" -d "$PGDB" -c \
+"${PSQL[@]}" -c \
   "SELECT company_name, city, province, phone FROM company_profile WHERE id = 1;"
