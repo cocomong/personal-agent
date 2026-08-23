@@ -10,7 +10,10 @@
 
 services:
   n8n:
-    image: docker.n8n.io/n8nio/n8n:latest
+    # Pinned deliberately: :latest means "whatever shipped today" and n8n has
+    # breaking changes between majors. Bump this tag only when you choose to
+    # upgrade (see "Upgrading" in backend/DEPLOY.md).
+    image: docker.n8n.io/n8nio/n8n:2.35.7
     restart: unless-stopped
     ports:
       - "5678:5678"

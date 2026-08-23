@@ -138,6 +138,32 @@ For off-site safety, add an `rclone` line to `backup.sh` (commented out at the b
 
 ---
 
+## 8. Upgrading n8n (or Postgres minor)
+
+Containers are disposable; data lives in volumes (`n8n_data`, `pgdata`), so an upgrade is: change one line, pull, recreate **that one service**. The other service never blinks.
+
+**n8n** — check the current stable at https://github.com/n8n-io/n8n/releases (e.g. `2.35.7`), then:
+
+```bash
+# 1. Edit deploy/docker-compose.yml: image: docker.n8n.io/n8nio/n8n:<new-version>
+cd ~/personal-agent/deploy
+docker compose pull n8n            # downloads new image; nothing else changes
+docker compose up -d n8n           # recreates ONLY n8n; postgres untouched
+docker compose ps                  # both services running
+docker logs n8n --tail 50          # clean startup?
+docker compose exec postgres pg_isready -U postgres   # DB still up
+```
+
+Then make one test call to the assistant and confirm a workflow runs.
+
+**Rollback** (if something's wrong): flip the version back in `docker-compose.yml`, then `docker compose up -d n8n` again — the old image is still cached locally, so it's a ~1-minute revert. Same pattern works for a Postgres *minor* bump (`postgres:17-alpine` floats within major 17).
+
+> **Postgres MAJOR upgrade (17 → 18)** is the one exception: it needs `pg_dump`/`pg_restore` (or `pg_upgrade`), which is a deliberate, rare event. Take a fresh backup first via `deploy/backup.sh`, then dump/restore into a new container. This is true regardless of where Postgres runs — it's a database procedure, not a compose concern.
+
+> **Why pinned, not `:latest`:** `docker compose pull` with `:latest` grabs whatever shipped that day — you can't predict it, and n8n breaks between majors. Pinning means *you* decide when to move, after reading the release notes.
+
+---
+
 ## Verification checklist
 
 - [ ] `migrate.sh` runs clean; `company_profile` shows Ireh Construction
