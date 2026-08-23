@@ -11,11 +11,12 @@
       "id": "gate-0001",
       "name": "Voice Gateway Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
+      "typeVersion": 2.1,
       "position": [
         240,
         300
-      ]
+      ],
+      "webhookId": "40a1c85a-7003-4535-af07-38436abb8e5f"
     },
     {
       "parameters": {
@@ -1420,5 +1421,6 @@
         ]
       ]
     }
-  }
+  },
+  "id": "5Dswa943KQF0rnZ1"
 }

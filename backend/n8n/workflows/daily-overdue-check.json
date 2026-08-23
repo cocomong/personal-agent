@@ -5,7 +5,10 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "cronExpression", "expression": "0 8 * * *" }
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
           ]
         }
       },
@@ -13,7 +16,10 @@
       "name": "Daily 08:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -25,8 +31,16 @@
       "name": "Query Overdue Invoices",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [480, 300],
-      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
     },
     {
       "parameters": {
@@ -36,7 +50,10 @@
       "name": "Format Overdue Email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 300]
+      "position": [
+        720,
+        300
+      ]
     },
     {
       "parameters": {
@@ -51,19 +68,52 @@
       "name": "Email Overdue Summary",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [960, 300],
-      "credentials": { "smtp": { "id": "YOUR_GMAIL_SMTP_CREDENTIALS_ID", "name": "Gmail SMTP" } }
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_GMAIL_SMTP_CREDENTIALS_ID",
+          "name": "Gmail SMTP"
+        }
+      }
     }
   ],
   "connections": {
     "Daily 08:00": {
-      "main": [[{ "node": "Query Overdue Invoices", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Query Overdue Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Query Overdue Invoices": {
-      "main": [[{ "node": "Format Overdue Email", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Format Overdue Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Format Overdue Email": {
-      "main": [[{ "node": "Email Overdue Summary", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Email Overdue Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
-  }
+  },
+  "id": "PpuMOm4l4bk9Arat"
 }

@@ -11,8 +11,12 @@
       "id": "ap-01",
       "name": "Estimate Approval Page",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [240, 100]
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        100
+      ],
+      "webhookId": "87c158ea-537f-4e0f-be36-906835dae540"
     },
     {
       "parameters": {
@@ -26,8 +30,16 @@
       "name": "Estimate Approval Lookup",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [480, 100],
-      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+      "position": [
+        480,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
     },
     {
       "parameters": {
@@ -37,7 +49,10 @@
       "name": "Estimate Approval Render",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 100]
+      "position": [
+        720,
+        100
+      ]
     },
     {
       "parameters": {
@@ -47,7 +62,10 @@
           "responseCode": 200,
           "responseHeaders": {
             "entries": [
-              { "name": "Content-Type", "value": "text/html; charset=utf-8" }
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
             ]
           }
         }
@@ -56,7 +74,10 @@
       "name": "Estimate Approval Respond",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [960, 100]
+      "position": [
+        960,
+        100
+      ]
     },
     {
       "parameters": {
@@ -68,8 +89,12 @@
       "id": "ap-05",
       "name": "Estimate Approval Action",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [240, 300]
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "d53c56b5-7626-4da2-b72e-06fa3ddfed9f"
     },
     {
       "parameters": {
@@ -83,8 +108,16 @@
       "name": "Estimate Approval Update",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [480, 300],
-      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
     },
     {
       "parameters": {
@@ -94,7 +127,10 @@
       "name": "Estimate Approval Confirm",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 300]
+      "position": [
+        720,
+        300
+      ]
     },
     {
       "parameters": {
@@ -104,7 +140,10 @@
           "responseCode": 200,
           "responseHeaders": {
             "entries": [
-              { "name": "Content-Type", "value": "text/html; charset=utf-8" }
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
             ]
           }
         }
@@ -113,7 +152,10 @@
       "name": "Estimate Approval Confirm Respond",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [960, 300]
+      "position": [
+        960,
+        300
+      ]
     },
     {
       "parameters": {
@@ -125,8 +167,12 @@
       "id": "ap-09",
       "name": "Change Order Approval Page",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [240, 500]
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        500
+      ],
+      "webhookId": "5bfffcf6-fb2c-4851-a28a-a45f4a001b25"
     },
     {
       "parameters": {
@@ -140,8 +186,16 @@
       "name": "Change Order Approval Lookup",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [480, 500],
-      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+      "position": [
+        480,
+        500
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
     },
     {
       "parameters": {
@@ -151,7 +205,10 @@
       "name": "Change Order Approval Render",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 500]
+      "position": [
+        720,
+        500
+      ]
     },
     {
       "parameters": {
@@ -161,7 +218,10 @@
           "responseCode": 200,
           "responseHeaders": {
             "entries": [
-              { "name": "Content-Type", "value": "text/html; charset=utf-8" }
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
             ]
           }
         }
@@ -170,7 +230,10 @@
       "name": "Change Order Approval Respond",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [960, 500]
+      "position": [
+        960,
+        500
+      ]
     },
     {
       "parameters": {
@@ -182,8 +245,12 @@
       "id": "ap-13",
       "name": "Change Order Approval Action",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [240, 700]
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        700
+      ],
+      "webhookId": "a4e0f5ee-f9c0-4bea-ae4b-aefff60d9760"
     },
     {
       "parameters": {
@@ -197,8 +264,16 @@
       "name": "Change Order Approval Update",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [480, 700],
-      "credentials": { "postgres": { "id": "YOUR_POSTGRES_CREDENTIALS_ID", "name": "Supabase PostgreSQL" } }
+      "position": [
+        480,
+        700
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
     },
     {
       "parameters": {
@@ -208,7 +283,10 @@
       "name": "Change Order Approval Confirm",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 700]
+      "position": [
+        720,
+        700
+      ]
     },
     {
       "parameters": {
@@ -218,7 +296,10 @@
           "responseCode": 200,
           "responseHeaders": {
             "entries": [
-              { "name": "Content-Type", "value": "text/html; charset=utf-8" }
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
             ]
           }
         }
@@ -227,45 +308,145 @@
       "name": "Change Order Approval Confirm Respond",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [960, 700]
+      "position": [
+        960,
+        700
+      ]
     }
   ],
   "connections": {
     "Estimate Approval Page": {
-      "main": [[{ "node": "Estimate Approval Lookup", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Estimate Approval Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Estimate Approval Lookup": {
-      "main": [[{ "node": "Estimate Approval Render", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Estimate Approval Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Estimate Approval Render": {
-      "main": [[{ "node": "Estimate Approval Respond", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Estimate Approval Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Estimate Approval Action": {
-      "main": [[{ "node": "Estimate Approval Update", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Estimate Approval Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Estimate Approval Update": {
-      "main": [[{ "node": "Estimate Approval Confirm", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Estimate Approval Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Estimate Approval Confirm": {
-      "main": [[{ "node": "Estimate Approval Confirm Respond", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Estimate Approval Confirm Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Change Order Approval Page": {
-      "main": [[{ "node": "Change Order Approval Lookup", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Change Order Approval Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Change Order Approval Lookup": {
-      "main": [[{ "node": "Change Order Approval Render", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Change Order Approval Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Change Order Approval Render": {
-      "main": [[{ "node": "Change Order Approval Respond", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Change Order Approval Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Change Order Approval Action": {
-      "main": [[{ "node": "Change Order Approval Update", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Change Order Approval Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Change Order Approval Update": {
-      "main": [[{ "node": "Change Order Approval Confirm", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Change Order Approval Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Change Order Approval Confirm": {
-      "main": [[{ "node": "Change Order Approval Confirm Respond", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Change Order Approval Confirm Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
-  }
+  },
+  "id": "lWJJelblgGSpoJUY"
 }
