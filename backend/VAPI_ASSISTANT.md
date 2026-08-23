@@ -8,8 +8,24 @@ Target assistant voice + text is **voice-primary, text-secondary** on the **same
 
 ## 1. Create the assistant
 
+> ✅ **Done.** The assistant **"Ireh Construction PM Assistant"** exists on Vapi
+> (id `67e2850c-1028-484d-bf52-d948826b2a7e`), created via the idempotent
+> deployer:
+>
+> ```bash
+> python3 backend/create_vapi_assistant.py   # creates or updates, safe to re-run
+> ```
+>
+> It reads `backend/vapi_assistant.json` (model, voice, system prompt, 17
+> server tools). The script adapts the JSON to the Vapi API's modern shape:
+> the system prompt goes into `model.messages`, and tools are upserted as
+> standalone **tool resources** referenced by `model.toolIds`. To change any
+> assistant setting, edit the JSON and re-run the script.
+
+Steps (only if creating from scratch in the dashboard):
+
 1. Log in to the [Vapi dashboard](https://dashboard.vapi.ai) → **Assistants** → **Create Assistant**.
-2. Save it and note the **Assistant ID** (`YOUR_VAPI_ASSISTANT_ID`) and the **Public Key** (used in the mobile app `mobile-flutter/lib/config.dart`).
+2. Save it and note the **Assistant ID** and the **org Public Key** (Settings → Public Key — it is org-level in this API version, not per-assistant).
 3. Copy the Assistant ID + Public Key into `mobile-flutter/lib/config.dart`.
 
 ---
@@ -118,21 +134,25 @@ Define the `function` name, description, and JSON `parameters` per Section 4. Su
 In `mobile-flutter/lib/config.dart`:
 
 ```dart
-const String vapiPublicKey = "<your_vapi_public_key>";
-const String vapiAssistantId = "<your_assistant_id>";
+const String vapiPublicKey  = "<org_public_key_from_dashboard_Settings>";
+const String vapiAssistantId = "67e2850c-1028-484d-bf52-d948826b2a7e";
 ```
 
-The app creates `new Vapi(VAPI_PUBLIC_KEY)`, calls `start(ASSISTANT_ID)` for voice, and `send({type:'add-message', ...})` for same-session text.
+> The public key is **org-level** — get it from the Vapi dashboard
+> (Settings → Public Key). The assistant id is already filled in.
+
+The app creates `VapiClient(VAPI_PUBLIC_KEY)`, calls `start(ASSISTANT_ID)` for voice, and `send({type:'add-message', ...})` for same-session text.
 
 ---
 
 ## Checklist
 
-- [ ] Assistant created; ID + public key in `mobile-flutter/lib/config.dart`
-- [ ] Voice provider = `11labs` (ADR-9)
-- [ ] Model chosen + locked
-- [ ] System prompt (Section 6) pasted
-- [ ] 17 function tools added (12 original + 5 new), all → n8n `/voice/gateway`
+- [x] Assistant created ("Ireh Construction PM Assistant", id `67e2850c-1028-484d-bf52-d948826b2a7e`) via `backend/create_vapi_assistant.py`
+- [ ] Org public key in `mobile-flutter/lib/config.dart` (dashboard → Settings → Public Key)
+- [x] Voice configured — `vapi`/Elliot (ADR-9 specified 11labs; edit `voice` in `backend/vapi_assistant.json` if an ElevenLabs voiceId is preferred)
+- [x] Model locked — `openai/gpt-4.1-mini`, temperature 0.2
+- [x] System prompt (Section 6) configured (`model.messages` in this API version)
+- [x] 17 function tools added (12 original + 5 new), all → n8n `/voice/gateway`
 - [ ] n8n gateway deployed + webhook URL reachable from Vapi
 - [ ] DB migrated (`db/0001` → `0011`); test data loaded (`db/0003_seed.sql` + `db/0012_seed_v2.sql`);
       idempotency verified (`db/0002_idempotency_test.sql` + `db/0013_verification.sql`)
