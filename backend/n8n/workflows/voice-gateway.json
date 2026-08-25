@@ -621,25 +621,25 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $env.GMAIL_USER }}",
-        "toEmail": "={{ $json.email }}",
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email }}",
         "subject": "={{ 'Invoice ' + $json.invoice_number + ' for ' + $json.project_name }}",
-        "emailFormat": "html",
-        "html": "={{ $json.invoiceHtml }}",
-        "options": {}
+        "emailType": "html",
+        "message": "={{ $json.invoiceHtml }}"
       },
       "id": "gate-0011b",
       "name": "Exec: send_customer_invoice_email",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
       "position": [
         960,
         940
       ],
       "credentials": {
-        "smtp": {
-          "id": "YOUR_GMAIL_SMTP_CREDENTIALS_ID",
-          "name": "Gmail SMTP"
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
+          "name": "Gmail account"
         }
       }
     },
@@ -727,25 +727,25 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $env.GMAIL_USER }}",
-        "toEmail": "={{ $json.email }}",
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email }}",
         "subject": "={{ 'Please approve your estimate for ' + $json.title }}",
-        "emailFormat": "html",
-        "html": "={{ $json.html }}",
-        "options": {}
+        "emailType": "html",
+        "message": "={{ $json.html }}"
       },
       "id": "gate-0016b",
       "name": "Exec: send_estimate_for_approval_email",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
       "position": [
         960,
         720
       ],
       "credentials": {
-        "smtp": {
-          "id": "YOUR_GMAIL_SMTP_CREDENTIALS_ID",
-          "name": "Gmail SMTP"
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
+          "name": "Gmail account"
         }
       }
     },
@@ -787,25 +787,25 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $env.GMAIL_USER }}",
-        "toEmail": "={{ $json.email }}",
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email }}",
         "subject": "={{ 'Please approve change order #' + $json.change_order_number + ' for ' + $json.project_name }}",
-        "emailFormat": "html",
-        "html": "={{ $json.html }}",
-        "options": {}
+        "emailType": "html",
+        "message": "={{ $json.html }}"
       },
       "id": "gate-0017b",
       "name": "Exec: send_change_order_for_approval_email",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
       "position": [
         960,
         860
       ],
       "credentials": {
-        "smtp": {
-          "id": "YOUR_GMAIL_SMTP_CREDENTIALS_ID",
-          "name": "Gmail SMTP"
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
+          "name": "Gmail account"
         }
       }
     },

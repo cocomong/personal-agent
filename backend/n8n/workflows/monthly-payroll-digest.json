@@ -57,25 +57,25 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $env.GMAIL_USER }}",
-        "toEmail": "={{ $env.GMAIL_USER }}",
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $env.GMAIL_USER }}",
         "subject": "={{ $json.subject }}",
-        "emailFormat": "html",
-        "html": "={{ $json.html }}",
-        "options": {}
+        "emailType": "html",
+        "message": "={{ $json.html }}"
       },
       "id": "mp-04",
       "name": "Email Payroll Digest",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
       "position": [
         960,
         300
       ],
       "credentials": {
-        "smtp": {
-          "id": "YOUR_GMAIL_SMTP_CREDENTIALS_ID",
-          "name": "Gmail SMTP"
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
+          "name": "Gmail account"
         }
       }
     }
