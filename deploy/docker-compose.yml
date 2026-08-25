@@ -66,6 +66,9 @@ services:
       # PM-assistant env used by the gateway/email Code nodes:
       - GMAIL_USER=${GMAIL_USER}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://n8n2.ordrnow.com}
+      # n8n 2.x blocks $env in Code nodes by default; the gateway's Code
+      # nodes read PUBLIC_BASE_URL (non-secret config) — opt back in.
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
     volumes:
       - n8n_data:/home/node/.n8n
       - ./local-files:/files
