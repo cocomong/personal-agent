@@ -452,6 +452,28 @@
               },
               "renameOutput": true,
               "outputKey": "list_invoices"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "send_sms_reminder",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "send_sms_reminder"
             }
           ]
         },
@@ -857,7 +879,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const toolCall = $('Normalize Tool Call').first().json;\nconst dbRow = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\n\nlet spoken = 'Done.';\nswitch (toolCall.action) {\n  case 'lookup_or_create_customer':\n    spoken = 'Customer ready.';\n    break;\n  case 'create_project':\n    spoken = 'Project created.';\n    break;\n  case 'create_estimate':\n    spoken = 'Baseline estimate recorded.';\n    break;\n  case 'create_change_order':\n    spoken = dbRow && dbRow.id ? `Change order ${dbRow.change_order_number} recorded.` : 'Could not create change order - baseline estimate must be approved first.';\n    break;\n  case 'log_timesheet':\n    spoken = dbRow && dbRow.id ? 'Hours logged.' : 'Worker not found - add the worker first.';\n    break;\n  case 'create_invoice':\n    spoken = dbRow && dbRow.invoice_number ? `Draft invoice ${dbRow.invoice_number} created for $${Number(dbRow.amount_due).toLocaleString()} (incl. tax).` : 'Draft invoice created.';\n    break;\n  case 'send_customer_invoice':\n    spoken = 'Invoice sent to the client.';\n    break;\n  case 'get_project_statement':\n    spoken = dbRow\n      ? `${dbRow.project_name} (${dbRow.customer_name}): Revised contract is $${Number(dbRow.total_revised_contract_value).toLocaleString()}, $${Number(dbRow.total_paid).toLocaleString()} collected. Outstanding balance is $${Number(dbRow.balance_remaining).toLocaleString()}.`\n      : 'Project not found.';\n    break;\n  case 'get_estimate_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-estimate?token=${dbRow.approval_token}` : 'Project not found.';\n    break;\n  case 'get_change_order_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-change-order?token=${dbRow.approval_token}` : 'Change order not found.';\n    break;\n  case 'send_estimate_for_approval': {\n    const row = $('Exec: send_estimate_for_approval_lookup').first().json;\n    spoken = row && row.email ? 'Approval link emailed to the client.' : 'Project or customer not found.';\n    break;\n  }\n  case 'send_change_order_for_approval': {\n    const row = $('Exec: send_change_order_for_approval_lookup').first().json;\n    spoken = row && row.email ? 'Change order approval link emailed to the client.' : 'Change order not found.';\n    break;\n  }\n  case 'record_payment':\n    spoken = dbRow && dbRow.invoice_number\n      ? `Payment recorded. ${dbRow.invoice_number} is now ${(dbRow.status || '').toLowerCase()}; balance due $${Number(dbRow.balance_due).toLocaleString()}.`\n      : 'Invoice not found.';\n    break;\n  case 'run_payroll':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll computed for ${dbRow.period_start} to ${dbRow.period_end}: ${dbRow.workers} worker(s), $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net.`\n      : 'No timesheets found for that period.';\n    break;\n  case 'get_payroll_summary':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll for ${dbRow.period_start} to ${dbRow.period_end}: $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net (${dbRow.workers} workers).`\n      : 'No payroll run found.';\n    break;\n  case 'add_worker':\n    spoken = dbRow && dbRow.worker_code\n      ? `Worker ${dbRow.name} added as ${dbRow.worker_code}${dbRow.trade ? ' (' + dbRow.trade + ')' : ''}.`\n      : 'Could not add worker.';\n    break;\n  case 'get_dashboard_summary': {\n    const rows = $input.all().map(i => i.json);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name}: contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_projects': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.project_name);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name} (${r.project_status}): contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_invoices': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.invoice_number);\n    if (!rows.length) { spoken = 'No invoices found.'; }\n    else {\n      spoken = rows.map(r => `${r.invoice_number} ${r.project_name}: $${Number(r.amount_due).toLocaleString()} (${r.status}), balance $${Number(r.balance_due).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  default:\n    spoken = `I'm not sure how to handle \"${toolCall.action}\". Please rephrase, or ask for something like project status, estimates, invoices, payments, or payroll.`;\n}\n\nreturn [{\n  json: {\n    toolCallId: toolCall.toolCallId,\n    result: spoken,\n  },\n}];"
+        "jsCode": "const toolCall = $('Normalize Tool Call').first().json;\nconst dbRow = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\n\nlet spoken = 'Done.';\nswitch (toolCall.action) {\n  case 'lookup_or_create_customer':\n    spoken = 'Customer ready.';\n    break;\n  case 'create_project':\n    spoken = 'Project created.';\n    break;\n  case 'create_estimate':\n    spoken = 'Baseline estimate recorded.';\n    break;\n  case 'create_change_order':\n    spoken = dbRow && dbRow.id ? `Change order ${dbRow.change_order_number} recorded.` : 'Could not create change order - baseline estimate must be approved first.';\n    break;\n  case 'log_timesheet':\n    spoken = dbRow && dbRow.id ? 'Hours logged.' : 'Worker not found - add the worker first.';\n    break;\n  case 'create_invoice':\n    spoken = dbRow && dbRow.invoice_number ? `Draft invoice ${dbRow.invoice_number} created for $${Number(dbRow.amount_due).toLocaleString()} (incl. tax).` : 'Draft invoice created.';\n    break;\n  case 'send_customer_invoice':\n    spoken = 'Invoice sent to the client.';\n    break;\n  case 'get_project_statement':\n    spoken = dbRow\n      ? `${dbRow.project_name} (${dbRow.customer_name}): Revised contract is $${Number(dbRow.total_revised_contract_value).toLocaleString()}, $${Number(dbRow.total_paid).toLocaleString()} collected. Outstanding balance is $${Number(dbRow.balance_remaining).toLocaleString()}.`\n      : 'Project not found.';\n    break;\n  case 'get_estimate_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-estimate?token=${dbRow.approval_token}` : 'Project not found.';\n    break;\n  case 'get_change_order_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-change-order?token=${dbRow.approval_token}` : 'Change order not found.';\n    break;\n  case 'send_estimate_for_approval': {\n    const row = $('Exec: send_estimate_for_approval_lookup').first().json;\n    spoken = row && row.email ? 'Approval link emailed to the client.' : 'Project or customer not found.';\n    break;\n  }\n  case 'send_change_order_for_approval': {\n    const row = $('Exec: send_change_order_for_approval_lookup').first().json;\n    spoken = row && row.email ? 'Change order approval link emailed to the client.' : 'Change order not found.';\n    break;\n  }\n  case 'record_payment':\n    spoken = dbRow && dbRow.invoice_number\n      ? `Payment recorded. ${dbRow.invoice_number} is now ${(dbRow.status || '').toLowerCase()}; balance due $${Number(dbRow.balance_due).toLocaleString()}.`\n      : 'Invoice not found.';\n    break;\n  case 'run_payroll':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll computed for ${dbRow.period_start} to ${dbRow.period_end}: ${dbRow.workers} worker(s), $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net.`\n      : 'No timesheets found for that period.';\n    break;\n  case 'get_payroll_summary':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll for ${dbRow.period_start} to ${dbRow.period_end}: $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net (${dbRow.workers} workers).`\n      : 'No payroll run found.';\n    break;\n  case 'add_worker':\n    spoken = dbRow && dbRow.worker_code\n      ? `Worker ${dbRow.name} added as ${dbRow.worker_code}${dbRow.trade ? ' (' + dbRow.trade + ')' : ''}.`\n      : 'Could not add worker.';\n    break;\n  case 'get_dashboard_summary': {\n    const rows = $input.all().map(i => i.json);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name}: contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_projects': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.project_name);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name} (${r.project_status}): contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_invoices': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.invoice_number);\n    if (!rows.length) { spoken = 'No invoices found.'; }\n    else {\n      spoken = rows.map(r => `${r.invoice_number} ${r.project_name}: $${Number(r.amount_due).toLocaleString()} (${r.status}), balance $${Number(r.balance_due).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'send_sms_reminder': {\n    const row = $('Exec: send_sms_lookup').first().json;\n    spoken = row && row.phone ? `SMS reminder sent to ${row.customer_name}.` : 'Customer not found or no phone number on file.';\n    break;\n  }\n  default:\n    spoken = `I'm not sure how to handle \"${toolCall.action}\". Please rephrase, or ask for something like project status, estimates, invoices, payments, or payroll.`;\n}\n\nreturn [{\n  json: {\n    toolCallId: toolCall.toolCallId,\n    result: spoken,\n  },\n}];"
       },
       "id": "gate-0012",
       "name": "Format Spoken Result",
@@ -1070,6 +1092,86 @@
         }
       },
       "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.name AS customer_name, c.phone FROM customers c LEFT JOIN projects p ON p.customer_id = c.id WHERE (LOWER(c.name) LIKE LOWER('%' || $1 || '%') OR LOWER(COALESCE(p.title, '')) LIKE LOWER('%' || $1 || '%') OR LOWER(c.email) = LOWER($1)) AND c.phone IS NOT NULL AND c.phone <> '' ORDER BY c.name LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [$json.toolArgs.customer_or_project] }}"
+        }
+      },
+      "id": "gate-0028",
+      "name": "Exec: send_sms_lookup",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "alwaysOutputData": true,
+      "position": [
+        960,
+        1640
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "sms-has-phone",
+              "leftValue": "={{ $json.phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "gate-0029",
+      "name": "Has Phone",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        1640
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sms",
+        "operation": "send",
+        "from": "={{ $env.TWILIO_FROM_NUMBER }}",
+        "to": "={{ $json.phone }}",
+        "message": "={{ $('Normalize Tool Call').first().json.toolArgs.message }}"
+      },
+      "id": "gate-0030",
+      "name": "Send SMS Reminder",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        1640
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "YOUR_TWILIO_CREDENTIALS_ID",
+          "name": "Twilio account"
+        }
+      }
     }
   ],
   "connections": {
@@ -1226,6 +1328,13 @@
         [
           {
             "node": "Exec: list_invoices",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Exec: send_sms_lookup",
             "type": "main",
             "index": 0
           }
@@ -1526,6 +1635,46 @@
       ]
     },
     "Exec: list_invoices": {
+      "main": [
+        [
+          {
+            "node": "Format Spoken Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exec: send_sms_lookup": {
+      "main": [
+        [
+          {
+            "node": "Has Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Phone": {
+      "main": [
+        [
+          {
+            "node": "Send SMS Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Spoken Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS Reminder": {
       "main": [
         [
           {

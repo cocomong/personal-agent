@@ -144,25 +144,25 @@
       "type": "function",
       "function": {
         "name": "create_change_order",
-        "description": "Creates a standalone change order amendment. DO NOT use for initial estimates.",
+        "description": "Adds a change order (amendment) to a project. Requires the project name/ID, a description, and the cost impact amount. The project's baseline must already be approved.",
         "parameters": {
           "type": "object",
           "properties": {
             "project_id": {
               "type": "string",
-              "description": "Target project UUID or shorthand name"
+              "description": "Project name or ID"
             },
             "description": {
               "type": "string",
-              "description": "Scope update or addition"
+              "description": "What the change order is for"
             },
-            "labor_cost": {
+            "cost_impact": {
               "type": "number",
-              "description": "Additional labor cost"
+              "description": "Cost impact in dollars (positive = addition, negative = credit)"
             },
-            "material_cost": {
+            "schedule_impact_days": {
               "type": "number",
-              "description": "Additional material cost"
+              "description": "Schedule impact in days; defaults to 0"
             },
             "reason": {
               "type": "string",
@@ -177,7 +177,8 @@
           },
           "required": [
             "project_id",
-            "description"
+            "description",
+            "cost_impact"
           ]
         }
       },
@@ -606,6 +607,34 @@
               "description": "Optional invoice status filter. Values: UNPAID, PAID, OVERDUE, PARTIAL, DRAFT. Omit to list all."
             }
           }
+        }
+      },
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_sms_reminder",
+        "description": "Sends an SMS text reminder to a customer. Provide the customer name (or project name) and the message text; the customer's phone number is looked up automatically.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "customer_or_project": {
+              "type": "string",
+              "description": "Customer name or project title to look up"
+            },
+            "message": {
+              "type": "string",
+              "description": "The SMS text to send"
+            }
+          },
+          "required": [
+            "customer_or_project",
+            "message"
+          ]
         }
       },
       "server": {
