@@ -89,9 +89,10 @@ def upsert_tools(tools: list[dict]) -> list[str]:
 def main() -> None:
     payload = json.loads(ASSISTANT_JSON.read_text())
     tools = payload.pop("tools")
+    default_tools = payload.pop("defaultTools", [])
     system_prompt = payload.pop("systemPrompt")
     name = payload["name"]
-    assert len(tools) == 20, f"expected 20 tools, got {len(tools)}"
+    assert len(tools) == 19, f"expected 19 tools, got {len(tools)}"
 
     payload.setdefault("transcriber", {})
     payload["transcriber"].setdefault("provider", "deepgram")
@@ -101,6 +102,7 @@ def main() -> None:
 
     payload["model"]["messages"] = [{"role": "system", "content": system_prompt}]
     payload["model"]["toolIds"] = tool_ids
+    payload["model"]["tools"] = default_tools  # native tools (e.g. sms)
 
     existing = [a for a in request("GET", "/assistant") if a.get("name") == name]
     if existing:
