@@ -20,11 +20,13 @@ Verified live (executions 1137-1139 on n8n2.ordrnow.com):
 
 ## Known issues (next session)
 
-1. COSMETIC: send_estimate_for_approval spoken reply says "Project or customer not found."
-   even though the email sends fine. Format Spoken Result checks `dbRow && dbRow.email`
-   but dbRow resolves from a different node's output than expected in that branch.
-   Investigate the data flow into Format Spoken Result for the send_*_for_approval cases.
-   (Likely: router outputKey vs the node feeding Format Spoken Result.)
+1. ~~COSMETIC: send_estimate_for_approval spoken reply says "Project or customer not found."~~ FIXED (commit a06393f)
+   Format Spoken Result read `$input`, which for the email branches is the Gmail
+   node's response (no `.email`). Now reads the lookup node's output directly.
+   Also fixed the identical latent bug in `send_change_order_for_approval`, and
+   added a switch fallback + `default` case so unrecognized actions reply to Vapi
+   with a clear message. ⚠️ NOT YET DEPLOYED to the live n8n — re-import
+   voice-gateway.json on the VPS and re-activate.
 
 2. Test fixture in live DB (created for the email test):
    - customer "Ireh Test" (support.ordrnow@gmail.com)
