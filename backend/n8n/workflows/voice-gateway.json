@@ -1125,13 +1125,11 @@
           }
         ],
         [
-          [
-            {
-              "node": "Format Spoken Result",
-              "type": "main",
-              "index": 0
-            }
-          ]
+          {
+            "node": "Format Spoken Result",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
