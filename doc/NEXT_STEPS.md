@@ -25,8 +25,9 @@ Verified live (executions 1137-1139 on n8n2.ordrnow.com):
    node's response (no `.email`). Now reads the lookup node's output directly.
    Also fixed the identical latent bug in `send_change_order_for_approval`, and
    added a switch fallback + `default` case so unrecognized actions reply to Vapi
-   with a clear message. ⚠️ NOT YET DEPLOYED to the live n8n — re-import
-   voice-gateway.json on the VPS and re-activate.
+   with a clear message. ✅ DEPLOYED + VERIFIED live (executions 1146/1147, 2026-08-26):
+   unknown action returns the fallback message; send_estimate_for_approval now
+   replies "Approval link emailed to the client." (email sent to test fixture).
 
 2. Test fixture in live DB (created for the email test):
    - customer "Ireh Test" (support.ordrnow@gmail.com)
