@@ -91,7 +91,7 @@ def main() -> None:
     tools = payload.pop("tools")
     system_prompt = payload.pop("systemPrompt")
     name = payload["name"]
-    assert len(tools) == 17, f"expected 17 tools, got {len(tools)}"
+    assert len(tools) == 19, f"expected 19 tools, got {len(tools)}"
 
     payload.setdefault("transcriber", {})
     payload["transcriber"].setdefault("provider", "deepgram")

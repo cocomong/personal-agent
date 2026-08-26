@@ -9,7 +9,9 @@
     "provider": "vapi",
     "voiceId": "Elliot"
   },
-  "transcriber": { "provider": "deepgram" },
+  "transcriber": {
+    "provider": "deepgram"
+  },
   "firstMessage": "Hi, I'm your construction project assistant. You can log site hours, record payments, run payroll, or ask for a project statement.",
   "endCallMessage": "Anything else, just call me back.",
   "systemPrompt": "# Role & Context\nYou are an executive voice project assistant managing 3-4 construction sites. You\ninteract with database systems via tool calls to manage Customers, Projects,\nEstimates, Change Orders, Invoices, and Payroll.\n\n# Rules of Operations & Logic\n1. Customer First: Before creating a project, verify or create the Customer record\n   using `lookup_or_create_customer`.\n2. Estimates vs Change Orders:\n   - Base scope = `create_estimate` (sets the baseline contract value).\n   - Any modifications after initial setup = `create_change_order`.\n   - NEVER overwrite the baseline estimate.\n3. Invoicing: Invoices may include progress percentages of the base estimate OR\n   specific approved change orders as distinct line items.\n4. Communication Style:\n   - Speak in clear, short sentences (10-15 words max).\n   - Confirm critical details (Customer Name, Project Name, Dollar Amounts) before\n     executing tools.\n   - Summarize tool execution outcomes in a single sentence.",
@@ -22,15 +24,34 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "first_name": { "type": "string", "description": "Customer's first name" },
-            "last_name": { "type": "string", "description": "Customer's last name" },
-            "email": { "type": "string", "description": "Customer email address" },
-            "phone": { "type": "string", "description": "Customer phone number" }
+            "first_name": {
+              "type": "string",
+              "description": "Customer's first name"
+            },
+            "last_name": {
+              "type": "string",
+              "description": "Customer's last name"
+            },
+            "email": {
+              "type": "string",
+              "description": "Customer email address"
+            },
+            "phone": {
+              "type": "string",
+              "description": "Customer phone number"
+            }
           },
-          "required": ["first_name", "last_name", "email"]
+          "required": [
+            "first_name",
+            "last_name",
+            "email"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -40,14 +61,29 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "customer_id": { "type": "string", "description": "UUID of the customer from lookup_or_create_customer" },
-            "project_name": { "type": "string", "description": "Shorthand site name (e.g. Kitsilano Reno)" },
-            "site_address": { "type": "string", "description": "Physical site address" }
+            "customer_id": {
+              "type": "string",
+              "description": "UUID of the customer from lookup_or_create_customer"
+            },
+            "project_name": {
+              "type": "string",
+              "description": "Shorthand site name (e.g. Kitsilano Reno)"
+            },
+            "site_address": {
+              "type": "string",
+              "description": "Physical site address"
+            }
           },
-          "required": ["customer_id", "project_name"]
+          "required": [
+            "customer_id",
+            "project_name"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -57,18 +93,52 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "Target project UUID or shorthand name" },
-            "scope_description": { "type": "string", "description": "Summary of baseline work scope" },
-            "labor_estimate": { "type": "number", "description": "Estimated labor cost" },
-            "material_estimate": { "type": "number", "description": "Estimated material cost" },
-            "revision": { "type": "number", "description": "Quote revision number; default 1" },
-            "status": { "type": "string", "enum": ["DRAFT", "SENT", "ACCEPTED", "DECLINED", "SUPERSEDED"], "description": "Quote status; default ACCEPTED" },
-            "valid_until": { "type": "string", "description": "Quote validity date (YYYY-MM-DD)" }
+            "project_id": {
+              "type": "string",
+              "description": "Target project UUID or shorthand name"
+            },
+            "scope_description": {
+              "type": "string",
+              "description": "Summary of baseline work scope"
+            },
+            "labor_estimate": {
+              "type": "number",
+              "description": "Estimated labor cost"
+            },
+            "material_estimate": {
+              "type": "number",
+              "description": "Estimated material cost"
+            },
+            "revision": {
+              "type": "number",
+              "description": "Quote revision number; default 1"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "SENT",
+                "ACCEPTED",
+                "DECLINED",
+                "SUPERSEDED"
+              ],
+              "description": "Quote status; default ACCEPTED"
+            },
+            "valid_until": {
+              "type": "string",
+              "description": "Quote validity date (YYYY-MM-DD)"
+            }
           },
-          "required": ["project_id", "scope_description"]
+          "required": [
+            "project_id",
+            "scope_description"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -78,16 +148,43 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "Target project UUID or shorthand name" },
-            "description": { "type": "string", "description": "Scope update or addition" },
-            "labor_cost": { "type": "number", "description": "Additional labor cost" },
-            "material_cost": { "type": "number", "description": "Additional material cost" },
-            "reason": { "type": "string", "enum": ["client_change", "site_condition", "owner_directed", "other"], "description": "Reason for the change" }
+            "project_id": {
+              "type": "string",
+              "description": "Target project UUID or shorthand name"
+            },
+            "description": {
+              "type": "string",
+              "description": "Scope update or addition"
+            },
+            "labor_cost": {
+              "type": "number",
+              "description": "Additional labor cost"
+            },
+            "material_cost": {
+              "type": "number",
+              "description": "Additional material cost"
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "client_change",
+                "site_condition",
+                "owner_directed",
+                "other"
+              ],
+              "description": "Reason for the change"
+            }
           },
-          "required": ["project_id", "description"]
+          "required": [
+            "project_id",
+            "description"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -97,16 +194,38 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "UUID of the project." },
-            "worker_name": { "type": "string", "description": "Full name of the worker." },
-            "hours_worked": { "type": "number", "description": "Number of hours to log (e.g. 7.5)." },
-            "overtime_hours": { "type": "number", "description": "Overtime hours logged; default 0" },
-            "work_description": { "type": "string", "description": "Summary of tasks performed." }
+            "project_id": {
+              "type": "string",
+              "description": "UUID of the project."
+            },
+            "worker_name": {
+              "type": "string",
+              "description": "Full name of the worker."
+            },
+            "hours_worked": {
+              "type": "number",
+              "description": "Number of hours to log (e.g. 7.5)."
+            },
+            "overtime_hours": {
+              "type": "number",
+              "description": "Overtime hours logged; default 0"
+            },
+            "work_description": {
+              "type": "string",
+              "description": "Summary of tasks performed."
+            }
           },
-          "required": ["project_id", "worker_name", "hours_worked"]
+          "required": [
+            "project_id",
+            "worker_name",
+            "hours_worked"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -116,16 +235,45 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "Target project UUID or shorthand name" },
-            "invoice_type": { "type": "string", "enum": ["Deposit", "Progress", "Change Order", "Final"] },
-            "include_change_order_ids": { "type": "array", "items": { "type": "string" }, "description": "Array of Change Order UUIDs to include as separate line items" },
-            "billing_percentage": { "type": "number", "description": "Percentage of base contract to bill (e.g. 25 for 25% progress)" },
-            "pst_applicable": { "type": "boolean", "description": "Apply PST (7%) in addition to GST; default false" }
+            "project_id": {
+              "type": "string",
+              "description": "Target project UUID or shorthand name"
+            },
+            "invoice_type": {
+              "type": "string",
+              "enum": [
+                "Deposit",
+                "Progress",
+                "Change Order",
+                "Final"
+              ]
+            },
+            "include_change_order_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of Change Order UUIDs to include as separate line items"
+            },
+            "billing_percentage": {
+              "type": "number",
+              "description": "Percentage of base contract to bill (e.g. 25 for 25% progress)"
+            },
+            "pst_applicable": {
+              "type": "boolean",
+              "description": "Apply PST (7%) in addition to GST; default false"
+            }
           },
-          "required": ["project_id", "invoice_type"]
+          "required": [
+            "project_id",
+            "invoice_type"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -135,13 +283,24 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "Target project name or ID" },
-            "invoice_id": { "type": "string", "description": "Specific invoice number to send (e.g. INV-1002)" }
+            "project_id": {
+              "type": "string",
+              "description": "Target project name or ID"
+            },
+            "invoice_id": {
+              "type": "string",
+              "description": "Specific invoice number to send (e.g. INV-1002)"
+            }
           },
-          "required": ["project_id"]
+          "required": [
+            "project_id"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -151,12 +310,20 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "UUID of the project." }
+            "project_id": {
+              "type": "string",
+              "description": "UUID of the project."
+            }
           },
-          "required": ["project_id"]
+          "required": [
+            "project_id"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -166,12 +333,20 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "Target project UUID or shorthand name" }
+            "project_id": {
+              "type": "string",
+              "description": "Target project UUID or shorthand name"
+            }
           },
-          "required": ["project_id"]
+          "required": [
+            "project_id"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -181,13 +356,25 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "Target project UUID or shorthand name" },
-            "change_order_number": { "type": "number", "description": "The change order number to approve (per project)" }
+            "project_id": {
+              "type": "string",
+              "description": "Target project UUID or shorthand name"
+            },
+            "change_order_number": {
+              "type": "number",
+              "description": "The change order number to approve (per project)"
+            }
           },
-          "required": ["project_id", "change_order_number"]
+          "required": [
+            "project_id",
+            "change_order_number"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -197,12 +384,20 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "Target project UUID or shorthand name" }
+            "project_id": {
+              "type": "string",
+              "description": "Target project UUID or shorthand name"
+            }
           },
-          "required": ["project_id"]
+          "required": [
+            "project_id"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -212,13 +407,25 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "Target project UUID or shorthand name" },
-            "change_order_number": { "type": "number", "description": "The change order number to approve (per project)" }
+            "project_id": {
+              "type": "string",
+              "description": "Target project UUID or shorthand name"
+            },
+            "change_order_number": {
+              "type": "number",
+              "description": "The change order number to approve (per project)"
+            }
           },
-          "required": ["project_id", "change_order_number"]
+          "required": [
+            "project_id",
+            "change_order_number"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -228,15 +435,39 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "invoice_number": { "type": "string", "description": "Invoice number, e.g. INV-1002" },
-            "amount": { "type": "number", "description": "Payment amount received" },
-            "payment_date": { "type": "string", "description": "Date received (YYYY-MM-DD); defaults to today" },
-            "method": { "type": "string", "enum": ["E-transfer", "Cheque", "Credit card", "Cash", "Other"] }
+            "invoice_number": {
+              "type": "string",
+              "description": "Invoice number, e.g. INV-1002"
+            },
+            "amount": {
+              "type": "number",
+              "description": "Payment amount received"
+            },
+            "payment_date": {
+              "type": "string",
+              "description": "Date received (YYYY-MM-DD); defaults to today"
+            },
+            "method": {
+              "type": "string",
+              "enum": [
+                "E-transfer",
+                "Cheque",
+                "Credit card",
+                "Cash",
+                "Other"
+              ]
+            }
           },
-          "required": ["invoice_number", "amount"]
+          "required": [
+            "invoice_number",
+            "amount"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -246,12 +477,21 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "period_end": { "type": "string", "description": "Payroll period end date (YYYY-MM-DD); defaults to end of the current month" },
-            "days": { "type": "number", "description": "Period length in days; defaults to the company payroll_period (monthly by default)" }
+            "period_end": {
+              "type": "string",
+              "description": "Payroll period end date (YYYY-MM-DD); defaults to end of the current month"
+            },
+            "days": {
+              "type": "number",
+              "description": "Period length in days; defaults to the company payroll_period (monthly by default)"
+            }
           }
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -261,11 +501,17 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "period_end": { "type": "string", "description": "Period end date (YYYY-MM-DD); omit for the latest run" }
+            "period_end": {
+              "type": "string",
+              "description": "Period end date (YYYY-MM-DD); omit for the latest run"
+            }
           }
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -275,16 +521,37 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "name": { "type": "string", "description": "Full worker name" },
-            "trade": { "type": "string", "description": "Trade, e.g. Framer, Electrician" },
-            "hourly_rate": { "type": "number", "description": "Hourly rate in dollars" },
-            "overtime_rate": { "type": "number", "description": "Overtime rate (defaults to 1.5x hourly)" },
-            "worker_code": { "type": "string", "description": "Optional short code; auto-generated W-### if omitted" }
+            "name": {
+              "type": "string",
+              "description": "Full worker name"
+            },
+            "trade": {
+              "type": "string",
+              "description": "Trade, e.g. Framer, Electrician"
+            },
+            "hourly_rate": {
+              "type": "number",
+              "description": "Hourly rate in dollars"
+            },
+            "overtime_rate": {
+              "type": "number",
+              "description": "Overtime rate (defaults to 1.5x hourly)"
+            },
+            "worker_code": {
+              "type": "string",
+              "description": "Optional short code; auto-generated W-### if omitted"
+            }
           },
-          "required": ["name", "hourly_rate"]
+          "required": [
+            "name",
+            "hourly_rate"
+          ]
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     },
     {
       "type": "function",
@@ -294,11 +561,57 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "project_id": { "type": "string", "description": "Optional project name or ID; omit for all projects" }
+            "project_id": {
+              "type": "string",
+              "description": "Optional project name or ID; omit for all projects"
+            }
           }
         }
       },
-      "server": { "url": "https://n8n2.ordrnow.com/webhook/voice/gateway", "timeoutSeconds": 15 }
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_projects",
+        "description": "Lists projects and their financial status (contract value, paid, balance remaining). Optionally filter by project status.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Optional project status filter. Values: ACTIVE, COMPLETED, ON_HOLD. Omit to list all projects."
+            }
+          }
+        }
+      },
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_invoices",
+        "description": "Lists invoices and their payment status (amount due, balance due, due date). Optionally filter by invoice status. Use OVERDUE or UNPAID to find who owes money.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Optional invoice status filter. Values: UNPAID, PAID, OVERDUE, PARTIAL, DRAFT. Omit to list all."
+            }
+          }
+        }
+      },
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     }
   ]
 }
