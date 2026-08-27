@@ -7,8 +7,14 @@ environment:
   sdk: ">=3.6.0 <4.0.0"
 
 dependencies:
+  firebase_core: ^4.14.0
+  firebase_messaging: ^16.6.0
   flutter:
     sdk: flutter
+  flutter_local_notifications: ^22.3.0
+  flutter_timezone: ^5.1.0
+  http: ^1.6.0
+  timezone: ^0.11.1
   vapi: ^0.1.0
 
 dev_dependencies:

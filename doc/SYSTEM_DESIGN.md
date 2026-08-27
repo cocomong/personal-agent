@@ -912,8 +912,34 @@ to the assistant).
 1. `db/0014` — `schedule_items` + `view_schedule` + `projects.completed_at` +
    settings row (`briefing_time`)
 2. Flutter — local-notification scheduler + settings screen (configurable time)
-3. Flutter — FCM push + device-token registration
+3. Flutter — FCM push + device-token registration (`register_device` tool + a
+   `device_tokens` table, db/0015); the FCM data-message path closes the
+   voice-configure loop (§14.8)
 4. n8n/Vapi — `get_today_schedule` + `set_briefing_time` tools
 5. n8n — Deadline Reminder workflow (push + email; statutory/lead-time/same-day)
 6. (optional) Vapi outbound call for urgent / server fallback
+
+### 14.8 Voice-configured briefing time — closing the loop
+`set_briefing_time` writes `company_profile.briefing_time`, but the phone's local
+scheduler would only see the new time on next launch. To make "set my briefing
+to 6:30am" reconfigure the phone itself, close the loop:
+
+1. Voice: `set_briefing_time` → n8n → `UPDATE company_profile.briefing_time`.
+2. n8n sends an FCM **data message** `{type:"briefing_time_changed",
+   briefing_time:"06:30"}` to every token in `device_tokens`.
+3. The app receives it in the background and re-schedules the local
+   notification (`zonedSchedule`) — no tap required.
+4. Vapi confirms the new time.
+
+Why this shape:
+- FCM is only the "config changed, re-sync" signal — the local notification
+  still fires the alarm (reliable, offline, OS-scheduled), so a dropped or
+  delayed push is never a lost alarm.
+- `device_tokens` (db/0015): one row per device — `token`, `platform`
+  (android/ios), `device_name`, `last_seen_at`; registered by a `register_device`
+  tool on app launch (which also returns the current `briefing_time` so the app
+  can schedule it immediately).
+- No new infra: FCM is already needed for the passive reminders (§14.4).
+- Fallback: on every launch/resume the app re-reads `briefing_time` and
+  re-schedules if it drifted, so the worst case is "takes effect next open".
 

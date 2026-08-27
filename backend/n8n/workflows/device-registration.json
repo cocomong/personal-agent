@@ -1,0 +1,119 @@
+{
+  "name": "Device Registration (app -> FCM token)",
+  "id": "device-registration-001",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "device/register",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "dev-0001",
+      "name": "Device Registration Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "1b169650-5b2e-4e08-941e-a4a0a46b3898"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO device_tokens (token, platform, device_name) VALUES ($1, $2, $3) ON CONFLICT (token) DO UPDATE SET platform = EXCLUDED.platform, device_name = EXCLUDED.device_name, last_seen_at = CURRENT_TIMESTAMP;",
+        "options": {
+          "queryReplacement": "={{ [$json.body.token, $json.body.platform, $json.body.device_name] }}"
+        }
+      },
+      "id": "dev-0002",
+      "name": "Exec: upsert_device_token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        500,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT to_char(briefing_time, 'HH24:MI') AS briefing_time FROM company_profile WHERE id = 1;",
+        "options": {}
+      },
+      "id": "dev-0003",
+      "name": "Exec: get_briefing_time",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        760,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'ok', briefing_time: $json.briefing_time } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "dev-0004",
+      "name": "Respond Device",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Device Registration Webhook": {
+      "main": [
+        [
+          {
+            "node": "Exec: upsert_device_token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exec: upsert_device_token": {
+      "main": [
+        [
+          {
+            "node": "Exec: get_briefing_time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exec: get_briefing_time": {
+      "main": [
+        [
+          {
+            "node": "Respond Device",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

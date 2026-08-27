@@ -1,4 +1,28 @@
-# NEXT STEPS — updated 2026-08-25 (end of day)
+# NEXT STEPS — updated 2026-08-27 (scheduling loop built)
+
+## Scheduling & reminders — voice-configured briefing time (BUILT + LIVE)
+- db/0015 `device_tokens` table applied live (register target + FCM push target).
+- New `device-registration` workflow live: `POST /webhook/device/register` upserts the
+  token and returns the current `briefing_time`. Verified: `{"status":"ok","briefing_time":"07:00"}`.
+- voice-gateway: `set_briefing_time` now chains `set_briefing_time -> get_device_tokens
+  -> Push Briefing Time Change -> Format Spoken Result`. Verified live: "Daily briefing
+  set to 06:30." (the Push node gracefully skips when FCM is unconfigured).
+- Flutter: local-notification scheduler (`notifications/notification_service.dart`) +
+  FCM registration/re-schedule (`notifications/fcm_service.dart`); degrades to default
+  07:00 when Firebase isn't set up yet.
+- **FCM SEND IS STUBBED until Firebase exists** — drop-in steps (Firebase project,
+  google-services.json, gradle plugin, n8n env vars) are in `mobile-flutter/SETUP.md` §6.
+
+## UPCOMING BUILDS (to do)
+1. **Capabilities KB (Vapi)** — instruction manual / self-introduction of the whole
+   assistant: the 21 tools, native SMS, email approvals. Upload as a Vapi Knowledge Base
+   (see the `vapi-kb-tool` skill).
+2. **Initial-setup onboarding wizard** — first-run flow capturing: company name, PM name +
+   how the PM wants to be addressed daily (e.g. "Dave" / "boss"), and workers (name + trade
+   + hourly rate). `workers` table exists (db/0001); `company_profile` has `signature_name`
+   but likely needs a new column for the PM preferred-name/greeting.
+
+---
 
 ## Status: VOICE GATEWAY IS WORKING END-TO-END ✅
 

@@ -1264,6 +1264,42 @@
           "name": "Supabase PostgreSQL"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT token FROM device_tokens ORDER BY created_at;",
+        "options": {},
+        "alwaysOutputData": true
+      },
+      "id": "gate-sched-tokens",
+      "name": "Exec: get_device_tokens",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1240,
+        1840
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Push Briefing Time Change (runs after set_briefing_time UPDATE + get_device_tokens).\n// Sends an FCM data message {type:\"briefing_time_changed\", briefing_time} to every\n// registered device so the app re-schedules its local notification (no tap needed).\n// Drop-in: set FCM_SERVICE_ACCOUNT_JSON (single-line service-account JSON) and\n// N8N_ALLOWED_BUILT_IN_MODULES=crypto in the compose env, then restart n8n.\nconst briefingTime = String($('Exec: set_briefing_time').first().json.briefing_time || '').slice(0, 5);\nconst tokens = $input.all().map(i => i.json).filter(r => r && r.token).map(r => r.token);\nconst saRaw = String($env.FCM_SERVICE_ACCOUNT_JSON || '').trim();\n\nlet pushed = 0;\nlet note = '';\nif (!saRaw) {\n  note = 'FCM not configured (FCM_SERVICE_ACCOUNT_JSON unset); push skipped';\n} else if (tokens.length === 0) {\n  note = 'no registered devices';\n} else {\n  try {\n    const sa = JSON.parse(saRaw);\n    const crypto = require('crypto');\n    const accessToken = await getAccessToken(sa, crypto);\n    for (const token of tokens) {\n      await sendFcm(accessToken, sa.project_id, token, { type: 'briefing_time_changed', briefing_time: briefingTime });\n      pushed++;\n    }\n    note = 'pushed to ' + pushed + ' device(s)';\n  } catch (e) {\n    note = 'FCM send failed: ' + e.message;\n  }\n}\n\nreturn [{ json: { briefing_time: briefingTime, pushed, note } }];\n\nfunction b64url(s) {\n  return s.replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n}\n\nasync function getAccessToken(sa, crypto) {\n  const now = Math.floor(Date.now() / 1000);\n  const head = b64url(Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64'));\n  const claim = b64url(Buffer.from(JSON.stringify({\n    iss: sa.client_email,\n    scope: 'https://www.googleapis.com/auth/firebase.messaging',\n    aud: sa.token_uri,\n    iat: now,\n    exp: now + 3600\n  })).toString('base64'));\n  const input = head + '.' + claim;\n  const sig = b64url(crypto.createSign('RSA-SHA256').update(input).sign(sa.private_key).toString('base64'));\n  const jwt = input + '.' + sig;\n  const resp = await $helpers.httpRequest({\n    method: 'POST',\n    url: sa.token_uri,\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n    body: 'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=' + encodeURIComponent(jwt)\n  });\n  return JSON.parse(resp).access_token;\n}\n\nasync function sendFcm(accessToken, projectId, token, data) {\n  await $helpers.httpRequest({\n    method: 'POST',\n    url: 'https://fcm.googleapis.com/v1/projects/' + projectId + '/messages:send',\n    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },\n    body: JSON.stringify({ message: { token, data } })\n  });\n}\n",
+        "mode": "runOnceForAllItems"
+      },
+      "id": "gate-sched-push",
+      "name": "Push Briefing Time Change",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        1840
+      ]
     }
   ],
   "connections": {
@@ -1810,6 +1846,28 @@
       ]
     },
     "Exec: set_briefing_time": {
+      "main": [
+        [
+          {
+            "node": "Exec: get_device_tokens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exec: get_device_tokens": {
+      "main": [
+        [
+          {
+            "node": "Push Briefing Time Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Push Briefing Time Change": {
       "main": [
         [
           {

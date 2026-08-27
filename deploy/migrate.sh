@@ -38,6 +38,7 @@ MIGRATIONS=(
   0003_seed.sql
   0012_seed_v2.sql
   0014_schedule.sql
+  0015_device_tokens.sql
 )
 
 VERIFY=(

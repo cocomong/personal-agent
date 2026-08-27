@@ -103,6 +103,36 @@ lib/
 └── models/transcript_entry.dart    # shared transcript row
 ```
 
+## 6. Daily-briefing notifications + FCM (voice-configured time)
+
+The app schedules a repeating daily local notification (`flutter_local_notifications`)
+that fires at the configured `briefing_time` (default 07:00). Tapping it opens the app
+for the in-app Vapi call.
+
+- `lib/notifications/notification_service.dart` — the local scheduler (offline,
+  OS-scheduled; no server needed to fire).
+- `lib/notifications/fcm_service.dart` — registers the FCM token with n8n
+  (`POST /webhook/device/register` -> `device_tokens` table) and re-schedules the
+  notification when a `briefing_time_changed` data message arrives (the voice-configure
+  loop). Degrades gracefully: no Firebase -> schedules the default 07:00.
+
+### Firebase drop-in steps (needed for voice-configured time to reach the phone)
+The code is wired but Firebase is NOT yet configured. To enable:
+1. Create a Firebase project; add an Android app (and iOS if desired).
+2. Drop `google-services.json` into `android/app/` (and `GoogleService-Info.plist` into `ios/Runner/`).
+3. Apply the Google services Gradle plugin:
+   - `android/build.gradle.kts`: `id("com.google.gms.google-services") version "4.4.2" apply false`
+   - `android/settings.gradle.kts`: add `id("com.google.gms.google-services")` to the plugins block.
+4. On the n8n VPS, add to the n8n service env in compose:
+   `FCM_SERVICE_ACCOUNT_JSON='{...single-line service account...}'` and
+   `N8N_ALLOWED_BUILT_IN_MODULES=crypto`, then `docker compose up -d n8n`.
+5. The app then registers its token on launch and `set_briefing_time` (voice) pushes
+   the new time straight to the phone.
+
+Android 13+ note: the scheduler uses `inexactAllowWhileIdle` (no special permission);
+switch to `exactAllowWhileIdle` only if exact-minute firing is required (then add
+`SCHEDULE_EXACT_ALARM` to the manifest).
+
 ## Notes
 
 - **Same-session voice + text**: `start()` drives the voice call; `sendUserText()` sends a typed
