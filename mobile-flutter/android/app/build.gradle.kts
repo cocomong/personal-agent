@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.personalagent.personal_agent_mobile"
+    namespace = "com.ordrnow.personal_agent_mobile"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.personalagent.personal_agent_mobile"
+        applicationId = "com.ordrnow.personal_agent_mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // daily_flutter (WebRTC) requires API 24+ — see SETUP.md.

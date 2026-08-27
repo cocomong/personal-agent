@@ -25,7 +25,7 @@ flutter pub get
 To (re)generate platform folders from scratch:
 
 ```bash
-flutter create --platforms=android,ios --org com.personalagent .
+flutter create --platforms=android,ios --org com.ordrnow .
 flutter pub add vapi
 ```
 
