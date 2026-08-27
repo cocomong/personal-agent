@@ -10,8 +10,12 @@
 - Flutter: local-notification scheduler (`notifications/notification_service.dart`) +
   FCM registration/re-schedule (`notifications/fcm_service.dart`); degrades to default
   07:00 when Firebase isn't set up yet.
-- **FCM SEND IS STUBBED until Firebase exists** — drop-in steps (Firebase project,
-  google-services.json, gradle plugin, n8n env vars) are in `mobile-flutter/SETUP.md` §6.
+- **FCM SEND IS LIVE + VERIFIED** — service account mounted at
+  secrets/fcm-service-account.json (uid 1000, 600), env `FCM_SERVICE_ACCOUNT_FILE` +
+  `NODE_FUNCTION_ALLOW_BUILTIN=crypto,fs,https`. Live test: set_briefing_time reached
+  FCM's API (real OAuth + HTTP v1); the fake test token was rejected with
+  INVALID_ARGUMENT — exactly the expected success signal. The app registers a real
+  token on first launch.
 
 ## UPCOMING BUILDS (to do)
 1. **Capabilities KB (Vapi)** — instruction manual / self-introduction of the whole

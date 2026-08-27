@@ -124,8 +124,12 @@ The code is wired but Firebase is NOT yet configured. To enable:
    - `android/settings.gradle.kts`: `id("com.google.gms.google-services") version "4.4.2" apply false`
    - `android/app/build.gradle.kts`: add `id("com.google.gms.google-services")` to the plugins block.
 4. On the n8n VPS, add to the n8n service env in compose:
-   `FCM_SERVICE_ACCOUNT_JSON='{...single-line service account...}'` and
-   `N8N_ALLOWED_BUILT_IN_MODULES=crypto`, then `docker compose up -d n8n`.
+   `FCM_SERVICE_ACCOUNT_FILE=/secrets/fcm-service-account.json` (mounted read-only
+   into the container) and `NODE_FUNCTION_ALLOW_BUILTIN=crypto,fs,https` — the
+   task-runner allowlist env var (NOTE: `N8N_ALLOWED_BUILT_IN_MODULES` does NOT
+   exist in n8n 2.35, and `$helpers` is not available in 2.35 Code nodes — the
+   FCM push node uses Node's `https` module instead), then
+   `docker compose up -d n8n`.
 5. The app then registers its token on launch and `set_briefing_time` (voice) pushes
    the new time straight to the phone.
 
