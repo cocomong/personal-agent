@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:vapi/vapi.dart';
 
 import 'agent_screen.dart';
 import 'notifications/fcm_service.dart';
@@ -7,15 +8,21 @@ import 'notifications/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Wait for the Vapi SDK to be ready (required on web; instant on mobile).
-  await VapiClient.platformInitialized.future;
-
-  // Local daily-briefing notification (offline, OS-scheduled).
-  await NotificationService.instance.init();
-  // FCM registration + briefing_time sync (graceful if Firebase isn't set up).
-  await FcmService.instance.init();
-
+  // Show the UI immediately; all async setup (notifications, FCM, briefing
+  // sync) runs in the background so a slow or hanging init can never leave a
+  // blank launch screen. VapiClient.platformInitialized is awaited lazily by
+  // VapiSessionController when a call actually starts.
   runApp(const PersonalAgentApp());
+  unawaited(_bootstrap());
+}
+
+Future<void> _bootstrap() async {
+  try {
+    await NotificationService.instance.init();
+    await FcmService.instance.init();
+  } catch (e) {
+    debugPrint('bootstrap error: $e');
+  }
 }
 
 class PersonalAgentApp extends StatelessWidget {

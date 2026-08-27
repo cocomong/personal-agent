@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
@@ -16,19 +17,23 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
-    tzdata.initializeTimeZones();
     try {
-      final info = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(info.identifier));
-    } catch (_) {
-      // fall back to UTC; schedule still fires (offset by the timezone delta)
+      tzdata.initializeTimeZones();
+      try {
+        final info = await FlutterTimezone.getLocalTimezone();
+        tz.setLocalLocation(tz.getLocation(info.identifier));
+      } catch (_) {
+        // fall back to UTC; schedule still fires (offset by the timezone delta)
+      }
+      const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const darwin = DarwinInitializationSettings();
+      await _plugin.initialize(
+        settings: const InitializationSettings(android: android, iOS: darwin),
+      );
+      await _requestPermissions();
+    } catch (e) {
+      debugPrint('NotificationService init failed: $e');
     }
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const darwin = DarwinInitializationSettings();
-    await _plugin.initialize(
-      settings: const InitializationSettings(android: android, iOS: darwin),
-    );
-    await _requestPermissions();
   }
 
   Future<void> _requestPermissions() async {

@@ -47,16 +47,18 @@ class FcmService {
 
   Future<String?> _registerDevice(String token) async {
     try {
-      final resp = await http.post(
-        Uri.parse('$n8nBaseUrl/webhook/device/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'token': token,
-          'platform':
-              defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
-          'device_name': 'phone',
-        }),
-      );
+      final resp = await http
+          .post(
+            Uri.parse('$n8nBaseUrl/webhook/device/register'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'token': token,
+              'platform':
+                  defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
+              'device_name': 'phone',
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
         return data['briefing_time'] as String?;
