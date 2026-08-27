@@ -613,6 +613,50 @@
         "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
         "timeoutSeconds": 15
       }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_schedule",
+        "description": "Returns the schedule — milestones, inspections, permits, deliveries, tasks, and derived events (invoice due dates, quote expiries, lien/holdback deadlines) due within the given number of days. Overdue items are always included. Use for questions like \"what is on my schedule today?\" or \"what is coming up this week?\".",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "number",
+              "description": "Number of days ahead to look; default 7"
+            }
+          },
+          "required": []
+        }
+      },
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "set_briefing_time",
+        "description": "Sets the daily briefing time in 24-hour HH:MM format.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "type": "string",
+              "description": "Time in 24-hour HH:MM, e.g. \"07:30\""
+            }
+          },
+          "required": [
+            "time"
+          ]
+        }
+      },
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
     }
   ],
   "defaultTools": [
