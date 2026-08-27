@@ -120,9 +120,9 @@ for the in-app Vapi call.
 The code is wired but Firebase is NOT yet configured. To enable:
 1. Create a Firebase project; add an Android app (and iOS if desired).
 2. Drop `google-services.json` into `android/app/` (and `GoogleService-Info.plist` into `ios/Runner/`).
-3. Apply the Google services Gradle plugin:
-   - `android/build.gradle.kts`: `id("com.google.gms.google-services") version "4.4.2" apply false`
-   - `android/settings.gradle.kts`: add `id("com.google.gms.google-services")` to the plugins block.
+3. Apply the Google services Gradle plugin (already done in the repo):
+   - `android/settings.gradle.kts`: `id("com.google.gms.google-services") version "4.4.2" apply false`
+   - `android/app/build.gradle.kts`: add `id("com.google.gms.google-services")` to the plugins block.
 4. On the n8n VPS, add to the n8n service env in compose:
    `FCM_SERVICE_ACCOUNT_JSON='{...single-line service account...}'` and
    `N8N_ALLOWED_BUILT_IN_MODULES=crypto`, then `docker compose up -d n8n`.
