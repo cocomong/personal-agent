@@ -37,6 +37,7 @@ MIGRATIONS=(
   0011_dashboard_views.sql
   0003_seed.sql
   0012_seed_v2.sql
+  0014_schedule.sql
 )
 
 VERIFY=(
