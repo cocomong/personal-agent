@@ -825,3 +825,95 @@ Three n8n Schedule Trigger workflows: `daily-overdue-check` (08:00), `daily-quot
 ### Decisions (Dave, 2026-08-22)
 Branding = full legal name/address/phone (configurable) · GST always + PST per-invoice flag · n8n HTML→PDF (reportlab fallback) · **monthly** payroll, DRAFT → approve · all 5 new tools shipped.
 
+## 14. Scheduling & Reminders (v1.4)
+
+### 14.1 What's missing
+The schema tracks money (invoices/payments), people (workers/timesheets) and
+approvals (estimates/change_orders), but NOT time — there is no tasks /
+milestones / events / deadlines table. The only date columns are scattered
+(`invoices.due_date`, `estimates.valid_until`, `change_orders.approved_at`,
+`projects.baseline_approved_at`, `timesheets.date_worked`). Everything else
+lives in Dave's head. This section adds a schedule layer + reminder channels.
+
+### 14.2 Scheduling needs (construction PM taxonomy)
+- **A. Project phases / milestones** — permits applied/issued, excavation,
+  foundation, framing, rough-ins (elec/plumbing/HVAC), inspections (footing,
+  framing, plumbing, electrical, insulation, final/occupancy), drywall/finishes,
+  substantial completion, punch list, closeout.
+- **B. Statutory deadlines (BC Builders Lien Act)** — 10% holdback on every
+  payment; **45-day** lien filing window; **55-day** holdback release; holdback
+  account on projects >$100k; **30-day** abandonment trigger. High legal risk;
+  these should be auto-computed.
+- **C. Financial schedule** — progress draws, invoice due dates, retention
+  release, quote validity expiry, change-order approval deadlines.
+- **D. Workforce + materials** — sub booking, worker start dates, long-lead-item
+  delivery dates.
+- **E. Client/approval deadlines** — estimate/CO approval reminders, client
+  finish selections.
+- **F. Post-handover** — warranty expiry, 1-year deficiency walkthrough.
+
+### 14.3 Schema integration (two layers → one view)
+- **Explicit** — new `schedule_items` table (db/0014): `id`, `project_id` (FK,
+  nullable), `type` (milestone|inspection|permit|delivery|meeting|task|lien|
+  holdback|warranty), `title`, `description`, `due_date`, `due_time`, `status`
+  (PENDING|DONE|CANCELLED), `priority`, `assigned_to`, `reminder_days`,
+  `reminder_sent_at`, `completed_at`, `created_at`.
+- **Auto-derived** — no entry needed; computed in `view_schedule`:
+  - `invoices` → `invoice_due` (due_date)
+  - `estimates` → `quote_expiry` (valid_until)
+  - `change_orders` → `co_approval` (approval window)
+  - `projects` → `lien_deadline` (+45d) and `holdback_release` (+55d) from a new
+    `projects.completed_at` column
+- New columns on `projects`: `completed_at DATE` (+ optional `scheduled_start`,
+  `target_completion`).
+
+### 14.4 Reminder channels
+| Channel | Mechanism | Use |
+|---|---|---|
+| Email | n8n Gmail (existing) | record / log |
+| Push | FCM (Firebase Cloud Messaging) via `firebase_messaging` | time-based nudges |
+| Voice call | Vapi in-app Web SDK (app-initiated) or `POST /call` (server) | daily briefing |
+| SMS | native Vapi `sms` tool (caller-bound) | customer texts |
+
+### 14.5 Active vs passive reminders — the rationale
+The daily briefing is ONCE A DAY and COARSE; passive (push) reminders are
+EVENT-TIME and FINE-GRAINED. Passive is NOT "remind me of everything" — it is
+worth it only for a narrow, high-signal set:
+1. **Statutory windows (lien/holdback)** — real legal downside; a multi-stage
+   poke (7d → 3d → 1d) is genuinely worth it where a once-a-day mention is not.
+2. **Lead-time lead-times** (order cabinets 3w before install; book the plumber
+   2w before rough-in) — the daily briefing only sees the next 24–48h, so it
+   misses these entirely.
+3. **Same-day time-specific events** (inspection at 9:30am; sub at 1pm; permit
+   office closes 4pm) — a "today" list at 7am ≠ a nudge at 8:45am.
+
+Redundancy note: generic "remind me of every due item" is NOT worth building —
+same-day (case 3) and recurring cadence are largely redundant IF Dave checks
+the briefing daily. Keep the passive layer to the three categories above; the
+briefing (plus the "what's today?" voice query) covers the rest.
+
+### 14.6 Daily briefing — app-initiated, configurable time
+**Decision (Dave, 2026-08-27):** the daily briefing call is INITIATED FROM THE
+FLUTTER APP, not n8n cron.
+- The app schedules a repeating daily local notification
+  (`flutter_local_notifications` `zonedSchedule` + `matchDateTimeComponents:
+  time`) at a configurable time.
+- Tapping it opens the app and starts the in-app Vapi call (`VapiClient.start`).
+- `briefing_time` is stored in a settings row; changeable in-app and by voice
+  (`set_briefing_time` tool); the app re-syncs on launch (or via a silent FCM
+  "settings changed" push).
+
+**iOS constraint:** an app cannot auto-start an audio call in the background —
+the notification-tap is the consent step. A fully-automatic "phone rings at 7am"
+model is the server-initiated `POST /call` variant (needs a Twilio number bound
+to the assistant).
+
+### 14.7 Build order
+1. `db/0014` — `schedule_items` + `view_schedule` + `projects.completed_at` +
+   settings row (`briefing_time`)
+2. Flutter — local-notification scheduler + settings screen (configurable time)
+3. Flutter — FCM push + device-token registration
+4. n8n/Vapi — `get_today_schedule` + `set_briefing_time` tools
+5. n8n — Deadline Reminder workflow (push + email; statutory/lead-time/same-day)
+6. (optional) Vapi outbound call for urgent / server fallback
+
