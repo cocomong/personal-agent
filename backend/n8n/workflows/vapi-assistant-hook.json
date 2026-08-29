@@ -1,0 +1,57 @@
+{
+ "name": "Vapi Assistant Hook (setup status into prompt)",
+ "id": "vapi-assistant-hook-001",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "vapi/assistant-hook",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "id": "hook-0001",
+   "name": "Assistant Hook Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [0, 0],
+   "webhookId": "vapi-assistant-hook"
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT (setup_completed_at IS NOT NULL) AS setup_complete,\n       company_name,\n       COALESCE(pm_preferred_name, '') AS pm_preferred_name,\n       (SELECT count(*) FROM workers WHERE active) AS worker_count\n  FROM company_profile WHERE id = 1;",
+    "options": {}
+   },
+   "id": "hook-0002",
+   "name": "Exec: read_setup_status",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "alwaysOutputData": true,
+   "position": [220, 0],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ { variables: { setup_complete: $json.setup_complete, company_name: $json.company_name, pm_preferred_name: $json.pm_preferred_name, worker_count: $json.worker_count } } }}",
+    "options": {"responseCode": 200}
+   },
+   "id": "hook-0003",
+   "name": "Respond Hook (variables)",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.1,
+   "position": [440, 0]
+  }
+ ],
+ "connections": {
+  "Assistant Hook Webhook": {"main": [[{"node": "Exec: read_setup_status", "type": "main", "index": 0}]]},
+  "Exec: read_setup_status": {"main": [[{"node": "Respond Hook (variables)", "type": "main", "index": 0}]]}
+ },
+ "settings": {},
+ "active": true
+}

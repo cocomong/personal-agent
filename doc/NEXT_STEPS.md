@@ -30,6 +30,10 @@
    VAPI_PRIVATE_KEY recovered from old session history -> saved in ~/.hermes/.env;
    create_vapi_assistant.py reads it. Notes + decisions:
    `doc/ONBOARDING_WIZARD_NOTES.md`, SYSTEM_DESIGN.md §15.
+   **Call-start hook (2026-08-29):** assistant `serverUrl` ->
+   `/webhook/vapi/assistant-hook` (workflow vapi-assistant-hook.json) injects
+   `setup_complete`/company/PM/worker variables into the system prompt at call
+   start — LLM knows setup state with zero tool calls (SYSTEM_DESIGN.md §15.2a).
 3. **Deadline Reminder workflow (n8n)** — the passive nudges from build-order item 5
    (Aug 26): lien/holdback reminders at 7/3/1 day, lead-time "order materials" nudges,
    same-day inspections. DB layer exists (`view_schedule` + lien/holdback clocks in 0014);

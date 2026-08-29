@@ -963,6 +963,28 @@ conversation inside the Vapi session and calls ONE completion tool at the end.
 it returns `setup_completed`, company name, PM name, preferred name, and the
 active worker count.
 
+### 15.2a Call-start hook — the LLM knows setup state BEFORE the first word
+The model has no memory across calls and can't read files — it only knows what
+is in its system prompt, the conversation, or tool results. So "local storage
+that denotes setup is done" already exists (`company_profile.setup_completed_at`);
+what was missing was delivering it without a tool call. Fix: a **Vapi call-start
+hook** (assistant-level `serverUrl`):
+
+1. On every call, Vapi POSTs to `https://n8n2.ordrnow.com/webhook/vapi/assistant-hook`
+   (n8n workflow `vapi-assistant-hook.json`, active).
+2. n8n reads `company_profile` → responds
+   `{"variables":{"setup_complete":false,"company_name":"Ireh Construction",
+   "pm_preferred_name":"","worker_count":"2"}}`.
+3. Vapi interpolates those into the system prompt's "Setup Status" block
+   (`setup_complete: {{setup_complete}}` …).
+4. The system prompt instructs: if `setup_complete` is false, run First-Run
+   Setup BEFORE any other work.
+
+Result: zero tool calls to learn setup state; onboarding triggers reliably on
+the first real call. `get_onboarding_status` remains as a mid-call refresh
+(e.g. right after `complete_onboarding`). Verified: hook returns correct
+variables live; assistant read-back shows `serverUrl` + prompt block.
+
 ### 15.3 Data model (decision D3)
 `company_profile` gains `pm_name`, `pm_preferred_name`, `setup_completed_at`
 (NULL = pending). Workers upsert into the existing `workers` table by

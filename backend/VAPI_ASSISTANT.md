@@ -90,6 +90,11 @@ Estimates, Change Orders, Invoices, and Payroll.
 > See `doc/ONBOARDING_WIZARD_NOTES.md` (decisions) and SYSTEM_DESIGN.md §15
 > (design). **LIVE end-to-end** — assistant synced to 23 tools; the deployer
 > (`create_vapi_assistant.py`) reads `VAPI_PRIVATE_KEY` from `~/.hermes/.env`.
+> The assistant also has a `serverUrl` call-start hook
+> (`https://n8n2.ordrnow.com/webhook/vapi/assistant-hook`, workflow
+> `vapi-assistant-hook.json`) that injects `setup_complete` + company/PM/worker
+> variables into the system prompt at call start — so the LLM knows setup state
+> with zero tool calls (SYSTEM_DESIGN.md §15.2a).
 
 ---
 
