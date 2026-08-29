@@ -1,1883 +1,2046 @@
 {
-  "name": "Voice Gateway (Vapi tool-calls)",
-  "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "voice/gateway",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "gate-0001",
-      "name": "Voice Gateway Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        240,
-        300
-      ],
-      "webhookId": "40a1c85a-7003-4535-af07-38436abb8e5f"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Normalize the Vapi tool call into a flat shape for the router.\n// n8n 2.x expression sandbox blocks reading .arguments on the payload,\n// so we extract in a Code node instead of a Set node expression.\nconst toolCall = $input.first().json.body.message.toolCalls[0];\nlet toolArgs = {};\ntry {\n  toolArgs = typeof toolCall.function.arguments === 'string'\n    ? JSON.parse(toolCall.function.arguments)\n    : (toolCall.function.arguments ?? {});\n} catch (e) {\n  // leave empty args; router will surface a missing-argument error\n}\nreturn [{\n  toolCallId: toolCall.id,\n  action: toolCall.function.name,\n  toolArgs,\n}];"
-      },
-      "id": "gate-0002",
-      "name": "Normalize Tool Call",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        480,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "rules": {
-          "values": [
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "lookup_or_create_customer",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "lookup_or_create_customer"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "create_project",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "create_project"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "create_estimate",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "create_estimate"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "create_change_order",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "create_change_order"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "log_timesheet",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "log_timesheet"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "create_invoice",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "create_invoice"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "send_customer_invoice",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "send_customer_invoice"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "get_project_statement",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "get_project_statement"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "get_estimate_approval_link",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "get_estimate_approval_link"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "get_change_order_approval_link",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "get_change_order_approval_link"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "send_estimate_for_approval",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "send_estimate_for_approval"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "send_change_order_for_approval",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "send_change_order_for_approval"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "record_payment",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "record_payment"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "run_payroll",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "run_payroll"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "get_payroll_summary",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "get_payroll_summary"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "add_worker",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "add_worker"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "get_dashboard_summary",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "get_dashboard_summary"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "list_projects",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "list_projects"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "list_invoices",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "list_invoices"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "get_schedule",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "get_schedule"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "set_briefing_time",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "set_briefing_time"
-            }
-          ]
-        },
-        "options": {
-          "fallbackOutput": "extra"
-        }
-      },
-      "id": "gate-0003",
-      "name": "Actions Sub-Router",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
-      "position": [
-        720,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH found AS (SELECT id FROM customers WHERE email = $1) INSERT INTO customers (name, email, phone) SELECT $2, $1, $3 WHERE NOT EXISTS (SELECT 1 FROM found) RETURNING id;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.email, $json.toolArgs.first_name + ' ' + $json.toolArgs.last_name, $json.toolArgs.phone] }}"
-        }
-      },
-      "id": "gate-0004",
-      "name": "Exec: lookup_or_create_customer",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        120
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO projects (customer_id, title, site_address) VALUES ($1, $2, $3) RETURNING id;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.customer_id, $json.toolArgs.project_name, $json.toolArgs.site_address] }}"
-        }
-      },
-      "id": "gate-0005",
-      "name": "Exec: create_project",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        220
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO estimates (project_id, division_code, scope_description, allocated_amount, revision, status, valid_until) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.project_id, ($json.toolArgs.division_code ?? 'Base Scope'), $json.toolArgs.scope_description, ($json.toolArgs.labor_estimate ?? 0) + ($json.toolArgs.material_estimate ?? 0), ($json.toolArgs.revision ?? 1), ($json.toolArgs.status ?? 'ACCEPTED'), ($json.toolArgs.valid_until ?? null)] }}"
-        }
-      },
-      "id": "gate-0006",
-      "name": "Exec: create_estimate",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        320
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH proj AS (SELECT id FROM projects WHERE (id::text = $1 OR LOWER(title) LIKE LOWER('%' || $1 || '%')) AND baseline_status = 'APPROVED' LIMIT 1) INSERT INTO change_orders (project_id, change_order_number, description, cost_impact, schedule_impact_days, reason, approval_status, tool_call_id) SELECT p.id, COALESCE((SELECT MAX(co.change_order_number) FROM change_orders co WHERE co.project_id = p.id), 0) + 1, $2, $3, $4, $6, 'PENDING', $5 FROM proj p ON CONFLICT (tool_call_id) DO NOTHING RETURNING id, change_order_number;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.description, $json.toolArgs.cost_impact, ($json.toolArgs.schedule_impact_days ?? 0), $json.toolCallId, ($json.toolArgs.reason ?? null)] }}"
-        }
-      },
-      "id": "gate-0007",
-      "name": "Exec: create_change_order",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        420
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH w AS (SELECT id FROM workers WHERE lower(name) = lower($2) OR worker_code = $2 OR id::text = $2 LIMIT 1) INSERT INTO timesheets (project_id, worker_id, hours_worked, overtime_hours, work_description, date_worked, tool_call_id) SELECT $1, w.id, $3, $4, $5, CURRENT_DATE, $6 FROM w ON CONFLICT (tool_call_id) DO NOTHING RETURNING id;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.worker_name, $json.toolArgs.hours_worked, ($json.toolArgs.overtime_hours ?? 0), $json.toolArgs.work_description, $json.toolCallId] }}"
-        }
-      },
-      "id": "gate-0008",
-      "name": "Exec: log_timesheet",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        520
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH cp AS (SELECT * FROM company_profile WHERE id = 1) INSERT INTO invoices (project_id, invoice_number, invoice_type, net_amount, gst_amount, pst_amount, pst_applicable, amount_due, holdback_amount, status, issued_date, due_date) SELECT p.id, $2, $3, ROUND(p.revised_contract_value * ($4 / 100.0), 2), ROUND(p.revised_contract_value * ($4 / 100.0) * cp.gst_rate, 2), CASE WHEN $5 THEN ROUND(p.revised_contract_value * ($4 / 100.0) * cp.pst_rate, 2) ELSE 0.00 END, $5, ROUND(p.revised_contract_value * ($4 / 100.0) * (1 + cp.gst_rate + CASE WHEN $5 THEN cp.pst_rate ELSE 0 END), 2), 0.00, 'DRAFT', CURRENT_DATE, CURRENT_DATE + cp.invoice_due_days * INTERVAL '1 day' FROM projects p, cp WHERE p.id = $1 RETURNING id, invoice_number, net_amount, gst_amount, pst_amount, amount_due;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.project_id, 'INV-' + Date.now(), $json.toolArgs.invoice_type, $json.toolArgs.billing_percentage, ($json.toolArgs.pst_applicable ?? false)] }}"
-        }
-      },
-      "id": "gate-0009",
-      "name": "Exec: create_invoice",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        620
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM view_project_financial_summary WHERE project_id::text = $1 OR LOWER(project_name) LIKE LOWER($2) LIMIT 1;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.project_id, '%' + $json.toolArgs.project_id + '%'] }}"
-        }
-      },
-      "id": "gate-0010",
-      "name": "Exec: get_project_statement",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        720
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT i.invoice_number, i.invoice_type, i.net_amount, i.gst_amount, i.pst_amount, i.amount_due, i.holdback_amount, i.issued_date, i.due_date, p.title AS project_name, c.name AS customer_name, c.email, cp.company_name, cp.email_from_name, cp.street_address, cp.city, cp.province, cp.postal_code, cp.phone, cp.signature_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM invoices i JOIN projects p ON p.id = i.project_id JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (i.id::text = $1 OR i.invoice_number = $1) LIMIT 1;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.invoice_id] }}"
-        }
-      },
-      "id": "gate-0011",
-      "name": "Exec: send_customer_invoice_lookup",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        820
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const inv = $input.first()?.json;\nconst money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\nconst company = inv?.company_name ?? 'Ireh Construction';\nconst accent = inv?.brand_accent_color ?? '#2563eb';\nconst primary = inv?.brand_primary_color ?? '#1a3a5c';\nconst addressLine = [inv?.street_address, inv?.city, `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`].filter(Boolean).join(', ');\nconst html = `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 2rem; }\n  .header { display: flex; justify-content: space-between; border-bottom: 2px solid ${primary}; padding-bottom: 1rem; }\n  .title { font-size: 1.5rem; font-weight: 700; color: ${primary}; }\n  .co { color: #64748b; font-size: .85rem; }\n  .row { display: flex; justify-content: space-between; padding: .4rem 0; }\n  .total { font-size: 1.3rem; font-weight: 700; border-top: 2px solid ${primary}; margin-top: 1rem; padding-top: 1rem; }\n  @media print { body { margin: 0; } }\n</style></head><body>\n  <div class=\"header\">\n    <div><div class=\"title\">${company}</div><div class=\"co\">${addressLine}</div><div class=\"co\">${inv?.phone ?? ''}</div></div>\n    <div style=\"text-align:right\"><div class=\"title\">Invoice</div><div>${inv?.invoice_number ?? ''}</div><div>Issued: ${inv?.issued_date ?? ''}</div><div>Due: ${inv?.due_date ?? ''}</div></div>\n  </div>\n  <p><strong>Project:</strong> ${inv?.project_name ?? ''}</p>\n  <p><strong>Customer:</strong> ${inv?.customer_name ?? ''}</p>\n  <p><strong>Type:</strong> ${inv?.invoice_type ?? ''}</p>\n  <div class=\"row\"><span>Subtotal (net)</span><span>${money(inv?.net_amount)}</span></div>\n  ${Number(inv?.gst_amount) ? `<div class=\"row\"><span>GST</span><span>${money(inv?.gst_amount)}</span></div>` : ''}\n  ${Number(inv?.pst_amount) ? `<div class=\"row\"><span>PST</span><span>${money(inv?.pst_amount)}</span></div>` : ''}\n  <div class=\"row\"><span>Holdback</span><span>${money(inv?.holdback_amount)}</span></div>\n  <div class=\"total\">Total due ${money(inv?.amount_due)}</div>\n</body></html>`;\nreturn [{ json: { ...inv, invoiceHtml: html } }];"
-      },
-      "id": "gate-0011a",
-      "name": "Render Invoice HTML",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        960,
-        880
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "message",
-        "operation": "send",
-        "sendTo": "={{ $json.email }}",
-        "subject": "={{ 'Invoice ' + $json.invoice_number + ' for ' + $json.project_name }}",
-        "emailType": "html",
-        "message": "={{ $json.invoiceHtml }}"
-      },
-      "id": "gate-0011b",
-      "name": "Exec: send_customer_invoice_email",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2,
-      "position": [
-        960,
-        940
-      ],
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
-          "name": "Gmail account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT p.id, p.title, p.baseline_approval_token AS approval_token FROM projects p WHERE p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%') LIMIT 1;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.project_id] }}"
-        }
-      },
-      "id": "gate-0014",
-      "name": "Exec: get_estimate_approval_link",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        460
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT co.id, co.change_order_number, co.approval_token, p.title AS project_name FROM change_orders co JOIN projects p ON p.id = co.project_id WHERE (p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%')) AND co.change_order_number = $2 LIMIT 1;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.change_order_number] }}"
-        }
-      },
-      "id": "gate-0015",
-      "name": "Exec: get_change_order_approval_link",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        560
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT p.id, p.title, p.baseline_approval_token AS token, c.name AS customer_name, c.email, cp.company_name, cp.email_from_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM projects p JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%')) LIMIT 1;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.project_id] }}"
-        }
-      },
-      "id": "gate-0016",
-      "name": "Exec: send_estimate_for_approval_lookup",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        640
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const r = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\nconst company = r?.company_name ?? 'Ireh Construction';\nconst accent = r?.brand_accent_color ?? '#2563eb';\nconst success = r?.brand_success_color ?? '#16a34a';\nconst link = `${base}/webhook/approve-estimate?token=${r?.token ?? ''}`;\nconst html = `<!doctype html><html><body style='font-family:Helvetica,Arial,sans-serif;color:#1e293b'><h2 style='color:${accent}'>Approve your estimate</h2><p>Hi ${r?.customer_name ?? ''}, please review and approve the baseline estimate for <strong>${r?.title ?? ''}</strong>.</p><p><a href='${link}' style='display:inline-block;padding:10px 16px;background:${success};color:#fff;text-decoration:none;border-radius:6px'>Review & approve</a></p><p style='color:#64748b;margin-top:24px'>${company}</p></body></html>`;\nreturn [{ json: { ...r, html } }];"
-      },
-      "id": "gate-0016a",
-      "name": "Render Estimate Approval Email",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        960,
-        680
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "message",
-        "operation": "send",
-        "sendTo": "={{ $json.email }}",
-        "subject": "={{ 'Please approve your estimate for ' + $json.title }}",
-        "emailType": "html",
-        "message": "={{ $json.html }}"
-      },
-      "id": "gate-0016b",
-      "name": "Exec: send_estimate_for_approval_email",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2,
-      "position": [
-        960,
-        720
-      ],
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
-          "name": "Gmail account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT co.id, co.change_order_number, co.description, co.cost_impact, co.approval_token AS token, p.title AS project_name, c.name AS customer_name, c.email, cp.company_name, cp.email_from_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM change_orders co JOIN projects p ON p.id = co.project_id JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%')) AND co.change_order_number = $2 LIMIT 1;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.change_order_number] }}"
-        }
-      },
-      "id": "gate-0017",
-      "name": "Exec: send_change_order_for_approval_lookup",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        780
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const r = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\nconst company = r?.company_name ?? 'Ireh Construction';\nconst accent = r?.brand_accent_color ?? '#2563eb';\nconst success = r?.brand_success_color ?? '#16a34a';\nconst link = `${base}/webhook/approve-change-order?token=${r?.token ?? ''}`;\nconst amount = Number(r?.cost_impact ?? 0);\nconst sign = amount >= 0 ? '+' : '';\nconst html = `<!doctype html><html><body style='font-family:Helvetica,Arial,sans-serif;color:#1e293b'><h2 style='color:${accent}'>Approve change order #${r?.change_order_number ?? ''}</h2><p>Hi ${r?.customer_name ?? ''}, please review and approve change order #${r?.change_order_number ?? ''} for <strong>${r?.project_name ?? ''}</strong>.</p><p>${r?.description ?? ''}: ${sign}$${Math.abs(amount).toLocaleString('en-US')}</p><p><a href='${link}' style='display:inline-block;padding:10px 16px;background:${success};color:#fff;text-decoration:none;border-radius:6px'>Review & approve</a></p><p style='color:#64748b;margin-top:24px'>${company}</p></body></html>`;\nreturn [{ json: { ...r, html } }];"
-      },
-      "id": "gate-0017a",
-      "name": "Render Change Order Approval Email",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        960,
-        820
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "message",
-        "operation": "send",
-        "sendTo": "={{ $json.email }}",
-        "subject": "={{ 'Please approve change order #' + $json.change_order_number + ' for ' + $json.project_name }}",
-        "emailType": "html",
-        "message": "={{ $json.html }}"
-      },
-      "id": "gate-0017b",
-      "name": "Exec: send_change_order_for_approval_email",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2,
-      "position": [
-        960,
-        860
-      ],
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
-          "name": "Gmail account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const toolCall = $('Normalize Tool Call').first().json;\nconst dbRow = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\n\nlet spoken = 'Done.';\nswitch (toolCall.action) {\n  case 'lookup_or_create_customer':\n    spoken = 'Customer ready.';\n    break;\n  case 'create_project':\n    spoken = 'Project created.';\n    break;\n  case 'create_estimate':\n    spoken = 'Baseline estimate recorded.';\n    break;\n  case 'create_change_order':\n    spoken = dbRow && dbRow.id ? `Change order ${dbRow.change_order_number} recorded.` : 'Could not create change order - baseline estimate must be approved first.';\n    break;\n  case 'log_timesheet':\n    spoken = dbRow && dbRow.id ? 'Hours logged.' : 'Worker not found - add the worker first.';\n    break;\n  case 'create_invoice':\n    spoken = dbRow && dbRow.invoice_number ? `Draft invoice ${dbRow.invoice_number} created for $${Number(dbRow.amount_due).toLocaleString()} (incl. tax).` : 'Draft invoice created.';\n    break;\n  case 'send_customer_invoice': {\n    const row = $('Exec: send_customer_invoice_lookup').first().json;\n    spoken = row && row.email ? 'Invoice sent to the client.' : 'Invoice or customer not found.';\n    break;\n  }\n  case 'get_project_statement':\n    spoken = dbRow\n      ? `${dbRow.project_name} (${dbRow.customer_name}): Revised contract is $${Number(dbRow.total_revised_contract_value).toLocaleString()}, $${Number(dbRow.total_paid).toLocaleString()} collected. Outstanding balance is $${Number(dbRow.balance_remaining).toLocaleString()}.`\n      : 'Project not found.';\n    break;\n  case 'get_estimate_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-estimate?token=${dbRow.approval_token}` : 'Project not found.';\n    break;\n  case 'get_change_order_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-change-order?token=${dbRow.approval_token}` : 'Change order not found.';\n    break;\n  case 'send_estimate_for_approval': {\n    const row = $('Exec: send_estimate_for_approval_lookup').first().json;\n    spoken = row && row.email ? 'Approval link emailed to the client.' : 'Project or customer not found.';\n    break;\n  }\n  case 'send_change_order_for_approval': {\n    const row = $('Exec: send_change_order_for_approval_lookup').first().json;\n    spoken = row && row.email ? 'Change order approval link emailed to the client.' : 'Change order not found.';\n    break;\n  }\n  case 'record_payment':\n    spoken = dbRow && dbRow.invoice_number\n      ? `Payment recorded. ${dbRow.invoice_number} is now ${(dbRow.status || '').toLowerCase()}; balance due $${Number(dbRow.balance_due).toLocaleString()}.`\n      : 'Invoice not found.';\n    break;\n  case 'run_payroll':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll computed for ${dbRow.period_start} to ${dbRow.period_end}: ${dbRow.workers} worker(s), $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net.`\n      : 'No timesheets found for that period.';\n    break;\n  case 'get_payroll_summary':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll for ${dbRow.period_start} to ${dbRow.period_end}: $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net (${dbRow.workers} workers).`\n      : 'No payroll run found.';\n    break;\n  case 'add_worker':\n    spoken = dbRow && dbRow.worker_code\n      ? `Worker ${dbRow.name} added as ${dbRow.worker_code}${dbRow.trade ? ' (' + dbRow.trade + ')' : ''}.`\n      : 'Could not add worker.';\n    break;\n  case 'get_dashboard_summary': {\n    const rows = $input.all().map(i => i.json);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name}: contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_projects': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.project_name);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name} (${r.project_status}): contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_invoices': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.invoice_number);\n    if (!rows.length) { spoken = 'No invoices found.'; }\n    else {\n      spoken = rows.map(r => `${r.invoice_number} ${r.project_name}: $${Number(r.amount_due).toLocaleString()} (${r.status}), balance $${Number(r.balance_due).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'get_schedule': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.title);\n    if (!rows.length) { spoken = 'Nothing scheduled in that window.'; }\n    else {\n      spoken = rows.map(r => {\n        let when = 'no date';\n        if (r.due_date) {\n          const parts = String(r.due_date).slice(0, 10).split('-').map(Number);\n          if (parts.length === 3 && parts.every(n => !isNaN(n))) {\n            const due = new Date(parts[0], parts[1] - 1, parts[2]);\n            const now = new Date(); now.setHours(0, 0, 0, 0);\n            const diff = Math.round((due - now) / 86400000);\n            when = diff < 0 ? (Math.abs(diff) + ' days overdue') : diff === 0 ? 'today' : diff === 1 ? 'tomorrow' : ('in ' + diff + ' days');\n          }\n        }\n        return `${r.title} ${when}${r.project_name ? ' (' + r.project_name + ')' : ''}`;\n      }).join('. ');\n    }\n    break;\n  }\n  case 'set_briefing_time': {\n    spoken = dbRow && dbRow.briefing_time ? `Daily briefing set to ${String(dbRow.briefing_time).slice(0, 5)}.` : 'Could not update briefing time.';\n    break;\n  }\n  default:\n    spoken = `I'm not sure how to handle \"${toolCall.action}\". Please rephrase, or ask for something like project status, estimates, invoices, payments, or payroll.`;\n}\n\nreturn [{\n  json: {\n    toolCallId: toolCall.toolCallId,\n    result: spoken,\n  },\n}];"
-      },
-      "id": "gate-0012",
-      "name": "Format Spoken Result",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1220,
-        420
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { results: [{ toolCallId: $json.toolCallId, result: $json.result }] } }}",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "id": "gate-0013",
-      "name": "Respond Vapi",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [
-        1500,
-        420
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH inv AS (SELECT id FROM invoices WHERE invoice_number = $1 OR id::text = $1 LIMIT 1) INSERT INTO payments (invoice_id, payment_date, amount, method, notes, tool_call_id) SELECT inv.id, COALESCE($3::date, CURRENT_DATE), $2, $4, $5, $6 FROM inv ON CONFLICT (tool_call_id) DO NOTHING RETURNING invoice_id;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.invoice_number, $json.toolArgs.amount, ($json.toolArgs.payment_date ?? null), ($json.toolArgs.method ?? null), ($json.toolArgs.notes ?? null), $json.toolCallId] }}"
-        }
-      },
-      "id": "gate-0020",
-      "name": "Exec: record_payment",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        980
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH vp AS (SELECT total_paid, balance_due, due_date FROM view_invoice_payments WHERE invoice_id = $1), upd AS (UPDATE invoices i SET status = CASE WHEN i.status = 'DRAFT' THEN i.status WHEN vp.total_paid = 0 THEN CASE WHEN vp.due_date < CURRENT_DATE THEN 'OVERDUE' ELSE 'UNPAID' END WHEN vp.balance_due <= 0 THEN 'PAID' ELSE 'PARTIAL' END FROM vp WHERE i.id = $1 RETURNING i.invoice_number, i.status) SELECT upd.invoice_number, upd.status, vp.total_paid, vp.balance_due FROM upd CROSS JOIN vp;",
-        "options": {
-          "queryReplacement": "={{ [$json.invoice_id] }}"
-        }
-      },
-      "id": "gate-0021",
-      "name": "Exec: record_payment_status",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        1040
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM fn_run_payroll($1::date, $2::int);",
-        "options": {
-          "queryReplacement": "={{ [($json.toolArgs.period_end ?? null), ($json.toolArgs.days ?? null)] }}"
-        }
-      },
-      "id": "gate-0022",
-      "name": "Exec: run_payroll",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        1100
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM view_payroll_summary WHERE ($1::date IS NULL OR period_end = $1::date) ORDER BY period_end DESC LIMIT 1;",
-        "options": {
-          "queryReplacement": "={{ [($json.toolArgs.period_end ?? null)] }}"
-        }
-      },
-      "id": "gate-0023",
-      "name": "Exec: get_payroll_summary",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        1160
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO workers (worker_code, name, trade, hourly_rate, overtime_rate) SELECT COALESCE($1, (SELECT 'W-' || LPAD(COALESCE(MAX(SUBSTRING(worker_code FROM '([0-9]+)')::int), 0) + 1, 3, '0') FROM workers WHERE worker_code ~ '^W-[0-9]+$')), $2, $3, $4, $5 ON CONFLICT (worker_code) DO UPDATE SET name = EXCLUDED.name, trade = EXCLUDED.trade, hourly_rate = EXCLUDED.hourly_rate, overtime_rate = EXCLUDED.overtime_rate RETURNING id, worker_code, name, trade, hourly_rate, overtime_rate;",
-        "options": {
-          "queryReplacement": "={{ [($json.toolArgs.worker_code ?? null), $json.toolArgs.name, ($json.toolArgs.trade ?? null), $json.toolArgs.hourly_rate, ($json.toolArgs.overtime_rate ?? null)] }}"
-        }
-      },
-      "id": "gate-0024",
-      "name": "Exec: add_worker",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        1220
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM view_project_financial_summary WHERE ($1::text IS NULL OR project_id::text = $1 OR LOWER(project_name) LIKE LOWER('%' || $1 || '%'));",
-        "options": {
-          "queryReplacement": "={{ [($json.toolArgs.project_id ?? null)] }}"
-        }
-      },
-      "id": "gate-0025",
-      "name": "Exec: get_dashboard_summary",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        1280
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM view_project_financial_summary WHERE ($1::text IS NULL OR LOWER(project_status) = LOWER($1)) ORDER BY project_name;",
-        "options": {
-          "queryReplacement": "={{ [($json.toolArgs.status ?? null)] }}"
-        }
-      },
-      "id": "gate-0026",
-      "name": "Exec: list_projects",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        1520
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT i.invoice_number, p.title AS project_name, c.name AS customer_name, i.amount_due, vp.total_paid, vp.balance_due, i.due_date, i.status FROM invoices i JOIN projects p ON p.id = i.project_id JOIN customers c ON c.id = p.customer_id JOIN view_invoice_payments vp ON vp.invoice_id = i.id WHERE ($1::text IS NULL OR LOWER(i.status) = LOWER($1)) ORDER BY i.due_date DESC;",
-        "options": {
-          "queryReplacement": "={{ [($json.toolArgs.status ?? null)] }}"
-        }
-      },
-      "id": "gate-0027",
-      "name": "Exec: list_invoices",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        960,
-        1560
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "has-email-(estimate)",
-              "leftValue": "={{ $json.email }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "gate-0031",
-      "name": "Has Email (Estimate)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        1220,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "has-email-(change-order)",
-              "leftValue": "={{ $json.email }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "gate-0032",
-      "name": "Has Email (Change Order)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        1220,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "has-email-(invoice)",
-              "leftValue": "={{ $json.email }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "gate-0033",
-      "name": "Has Email (Invoice)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        1220,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM view_schedule WHERE status <> 'DONE' AND (due_date IS NULL OR due_date <= CURRENT_DATE + ($1::int || ' days')::interval) ORDER BY due_date NULLS LAST, due_time NULLS LAST;",
-        "options": {
-          "queryReplacement": "={{ [($json.toolArgs.days ?? 7)] }}"
-        }
-      },
-      "id": "gate-0034",
-      "name": "Exec: get_schedule",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "alwaysOutputData": true,
-      "position": [
-        960,
-        1800
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE company_profile SET briefing_time = $1::time WHERE id = 1 RETURNING briefing_time;",
-        "options": {
-          "queryReplacement": "={{ [$json.toolArgs.time] }}"
-        }
-      },
-      "id": "gate-0035",
-      "name": "Exec: set_briefing_time",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "alwaysOutputData": true,
-      "position": [
-        960,
-        1840
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT token FROM device_tokens ORDER BY created_at;",
-        "options": {},
-        "alwaysOutputData": true
-      },
-      "id": "gate-sched-tokens",
-      "name": "Exec: get_device_tokens",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        1240,
-        1840
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-          "name": "Supabase PostgreSQL"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Push Briefing Time Change (runs after set_briefing_time UPDATE + get_device_tokens).\n// Sends an FCM data message {type:\"briefing_time_changed\", briefing_time} to every\n// registered device so the app re-schedules its local notification (no tap needed).\n// Key sources (in order): FCM_SERVICE_ACCOUNT_FILE (mounted secrets file) or\n// FCM_SERVICE_ACCOUNT_JSON (single-line env). Needs NODE_FUNCTION_ALLOW_BUILTIN=crypto,fs,https\n// (n8n 2.35 task-runner allowlist env; $helpers does NOT exist in 2.35 Code nodes).\nconst briefingTime = String($('Exec: set_briefing_time').first().json.briefing_time || '').slice(0, 5);\nconst tokens = $input.all().map(i => i.json).filter(r => r && r.token).map(r => r.token);\nlet saRaw = String($env.FCM_SERVICE_ACCOUNT_JSON || '').trim();\nlet keyNote = '';\nif (!saRaw) {\n  try {\n    const file = String($env.FCM_SERVICE_ACCOUNT_FILE || '').trim();\n    if (file) saRaw = require('fs').readFileSync(file, 'utf8').trim();\n  } catch (e) {\n    keyNote = 'FCM key file read failed: ' + e.message;\n  }\n}\n\nlet pushed = 0;\nlet note = keyNote || 'FCM not configured (FCM_SERVICE_ACCOUNT_JSON/FILE unset); push skipped';\nif (!saRaw) {\n  // no key — note already explains (unset or file read failure)\n} else if (tokens.length === 0) {\n  note = 'no registered devices';\n} else {\n  try {\n    const sa = JSON.parse(saRaw);\n    const crypto = require('crypto');\n    const accessToken = await getAccessToken(sa, crypto);\n    for (const token of tokens) {\n      await sendFcm(accessToken, sa.project_id, token, { type: 'briefing_time_changed', briefing_time: briefingTime });\n      pushed++;\n    }\n    note = 'pushed to ' + pushed + ' device(s)';\n  } catch (e) {\n    note = 'FCM send failed: ' + e.message;\n  }\n}\n\nreturn [{ json: { briefing_time: briefingTime, pushed, note } }];\n\nfunction b64url(s) {\n  return s.replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n}\n\nfunction splitUrl(u) {\n  const m = u.match(/^https?:\\/\\/([^/]+)(\\/[^?#]*)?(\\?[^#]*)?/);\n  return { hostname: m[1], path: (m[2] || '/') + (m[3] || '') };\n}\n\nfunction httpsRequest(options, body) {\n  return new Promise((resolve, reject) => {\n    const req = require('https').request(options, (res) => {\n      let data = '';\n      res.on('data', (c) => (data += c));\n      res.on('end', () => resolve({ status: res.statusCode, body: data }));\n    });\n    req.on('error', reject);\n    req.write(body);\n    req.end();\n  });\n}\n\nasync function getAccessToken(sa, crypto) {\n  const now = Math.floor(Date.now() / 1000);\n  const head = b64url(Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64'));\n  const claim = b64url(Buffer.from(JSON.stringify({\n    iss: sa.client_email,\n    scope: 'https://www.googleapis.com/auth/firebase.messaging',\n    aud: sa.token_uri,\n    iat: now,\n    exp: now + 3600\n  })).toString('base64'));\n  const input = head + '.' + claim;\n  const sig = b64url(crypto.createSign('RSA-SHA256').update(input).sign(sa.private_key).toString('base64'));\n  const jwt = input + '.' + sig;\n  const u = splitUrl(sa.token_uri);\n  const resp = await httpsRequest({\n    method: 'POST',\n    hostname: u.hostname,\n    path: u.path,\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n  }, 'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=' + encodeURIComponent(jwt));\n  const parsed = JSON.parse(resp.body);\n  if (!parsed.access_token) {\n    throw new Error('token exchange failed (' + resp.status + '): ' + resp.body.slice(0, 200));\n  }\n  return parsed.access_token;\n}\n\nasync function sendFcm(accessToken, projectId, token, data) {\n  const u = splitUrl('https://fcm.googleapis.com/v1/projects/' + projectId + '/messages:send');\n  const resp = await httpsRequest({\n    method: 'POST',\n    hostname: u.hostname,\n    path: u.path,\n    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },\n  }, JSON.stringify({ message: { token, data } }));\n  if (resp.status >= 400) {\n    throw new Error('FCM HTTP ' + resp.status + ': ' + resp.body.slice(0, 200));\n  }\n}\n",
-        "mode": "runOnceForAllItems"
-      },
-      "id": "gate-sched-push",
-      "name": "Push Briefing Time Change",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1500,
-        1840
-      ]
-    }
-  ],
-  "connections": {
-    "Voice Gateway Webhook": {
-      "main": [
-        [
-          {
-            "node": "Normalize Tool Call",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Normalize Tool Call": {
-      "main": [
-        [
-          {
-            "node": "Actions Sub-Router",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Actions Sub-Router": {
-      "main": [
-        [
-          {
-            "node": "Exec: lookup_or_create_customer",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: create_project",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: create_estimate",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: create_change_order",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: log_timesheet",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: create_invoice",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: send_customer_invoice_lookup",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: get_project_statement",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: get_estimate_approval_link",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: get_change_order_approval_link",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: send_estimate_for_approval_lookup",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: send_change_order_for_approval_lookup",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: record_payment",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: run_payroll",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: get_payroll_summary",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: add_worker",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: get_dashboard_summary",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: list_projects",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: list_invoices",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: get_schedule",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Exec: set_briefing_time",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: lookup_or_create_customer": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: create_project": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: create_estimate": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: create_change_order": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: log_timesheet": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: create_invoice": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: send_customer_invoice_lookup": {
-      "main": [
-        [
-          {
-            "node": "Has Email (Invoice)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Render Invoice HTML": {
-      "main": [
-        [
-          {
-            "node": "Exec: send_customer_invoice_email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: send_customer_invoice_email": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: get_project_statement": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: get_estimate_approval_link": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: get_change_order_approval_link": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: send_estimate_for_approval_lookup": {
-      "main": [
-        [
-          {
-            "node": "Has Email (Estimate)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Render Estimate Approval Email": {
-      "main": [
-        [
-          {
-            "node": "Exec: send_estimate_for_approval_email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: send_estimate_for_approval_email": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: send_change_order_for_approval_lookup": {
-      "main": [
-        [
-          {
-            "node": "Has Email (Change Order)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Render Change Order Approval Email": {
-      "main": [
-        [
-          {
-            "node": "Exec: send_change_order_for_approval_email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: send_change_order_for_approval_email": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Format Spoken Result": {
-      "main": [
-        [
-          {
-            "node": "Respond Vapi",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: record_payment": {
-      "main": [
-        [
-          {
-            "node": "Exec: record_payment_status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: record_payment_status": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: run_payroll": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: get_payroll_summary": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: add_worker": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: get_dashboard_summary": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: list_projects": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: list_invoices": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Email (Estimate)": {
-      "main": [
-        [
-          {
-            "node": "Render Estimate Approval Email",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Email (Change Order)": {
-      "main": [
-        [
-          {
-            "node": "Render Change Order Approval Email",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Email (Invoice)": {
-      "main": [
-        [
-          {
-            "node": "Render Invoice HTML",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: get_schedule": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: set_briefing_time": {
-      "main": [
-        [
-          {
-            "node": "Exec: get_device_tokens",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exec: get_device_tokens": {
-      "main": [
-        [
-          {
-            "node": "Push Briefing Time Change",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Push Briefing Time Change": {
-      "main": [
-        [
-          {
-            "node": "Format Spoken Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+ "name": "Voice Gateway (Vapi tool-calls)",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "voice/gateway",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "id": "gate-0001",
+   "name": "Voice Gateway Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.1,
+   "position": [
+    240,
+    300
+   ],
+   "webhookId": "40a1c85a-7003-4535-af07-38436abb8e5f"
   },
-  "id": "5Dswa943KQF0rnZ1"
+  {
+   "parameters": {
+    "jsCode": "// Normalize the Vapi tool call into a flat shape for the router.\n// n8n 2.x expression sandbox blocks reading .arguments on the payload,\n// so we extract in a Code node instead of a Set node expression.\nconst toolCall = $input.first().json.body.message.toolCalls[0];\nlet toolArgs = {};\ntry {\n  toolArgs = typeof toolCall.function.arguments === 'string'\n    ? JSON.parse(toolCall.function.arguments)\n    : (toolCall.function.arguments ?? {});\n} catch (e) {\n  // leave empty args; router will surface a missing-argument error\n}\nreturn [{\n  toolCallId: toolCall.id,\n  action: toolCall.function.name,\n  toolArgs,\n}];"
+   },
+   "id": "gate-0002",
+   "name": "Normalize Tool Call",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    480,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "rules": {
+     "values": [
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "lookup_or_create_customer",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "lookup_or_create_customer"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "create_project",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "create_project"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "create_estimate",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "create_estimate"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "create_change_order",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "create_change_order"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "log_timesheet",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "log_timesheet"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "create_invoice",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "create_invoice"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "send_customer_invoice",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "send_customer_invoice"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "get_project_statement",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "get_project_statement"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "get_estimate_approval_link",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "get_estimate_approval_link"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "get_change_order_approval_link",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "get_change_order_approval_link"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "send_estimate_for_approval",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "send_estimate_for_approval"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "send_change_order_for_approval",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "send_change_order_for_approval"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "record_payment",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "record_payment"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "run_payroll",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "run_payroll"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "get_payroll_summary",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "get_payroll_summary"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "add_worker",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "add_worker"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "get_dashboard_summary",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "get_dashboard_summary"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "list_projects",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "list_projects"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "list_invoices",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "list_invoices"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "get_schedule",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "get_schedule"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "set_briefing_time",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "set_briefing_time"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "get_onboarding_status",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "get_onboarding_status"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "complete_onboarding",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "complete_onboarding"
+      }
+     ]
+    },
+    "options": {
+     "fallbackOutput": "extra"
+    }
+   },
+   "id": "gate-0003",
+   "name": "Actions Sub-Router",
+   "type": "n8n-nodes-base.switch",
+   "typeVersion": 3,
+   "position": [
+    720,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH found AS (SELECT id FROM customers WHERE email = $1) INSERT INTO customers (name, email, phone) SELECT $2, $1, $3 WHERE NOT EXISTS (SELECT 1 FROM found) RETURNING id;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.email, $json.toolArgs.first_name + ' ' + $json.toolArgs.last_name, $json.toolArgs.phone] }}"
+    }
+   },
+   "id": "gate-0004",
+   "name": "Exec: lookup_or_create_customer",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    120
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "INSERT INTO projects (customer_id, title, site_address) VALUES ($1, $2, $3) RETURNING id;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.customer_id, $json.toolArgs.project_name, $json.toolArgs.site_address] }}"
+    }
+   },
+   "id": "gate-0005",
+   "name": "Exec: create_project",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    220
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "INSERT INTO estimates (project_id, division_code, scope_description, allocated_amount, revision, status, valid_until) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.project_id, ($json.toolArgs.division_code ?? 'Base Scope'), $json.toolArgs.scope_description, ($json.toolArgs.labor_estimate ?? 0) + ($json.toolArgs.material_estimate ?? 0), ($json.toolArgs.revision ?? 1), ($json.toolArgs.status ?? 'ACCEPTED'), ($json.toolArgs.valid_until ?? null)] }}"
+    }
+   },
+   "id": "gate-0006",
+   "name": "Exec: create_estimate",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    320
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH proj AS (SELECT id FROM projects WHERE (id::text = $1 OR LOWER(title) LIKE LOWER('%' || $1 || '%')) AND baseline_status = 'APPROVED' LIMIT 1) INSERT INTO change_orders (project_id, change_order_number, description, cost_impact, schedule_impact_days, reason, approval_status, tool_call_id) SELECT p.id, COALESCE((SELECT MAX(co.change_order_number) FROM change_orders co WHERE co.project_id = p.id), 0) + 1, $2, $3, $4, $6, 'PENDING', $5 FROM proj p ON CONFLICT (tool_call_id) DO NOTHING RETURNING id, change_order_number;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.description, $json.toolArgs.cost_impact, ($json.toolArgs.schedule_impact_days ?? 0), $json.toolCallId, ($json.toolArgs.reason ?? null)] }}"
+    }
+   },
+   "id": "gate-0007",
+   "name": "Exec: create_change_order",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    420
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH w AS (SELECT id FROM workers WHERE lower(name) = lower($2) OR worker_code = $2 OR id::text = $2 LIMIT 1) INSERT INTO timesheets (project_id, worker_id, hours_worked, overtime_hours, work_description, date_worked, tool_call_id) SELECT $1, w.id, $3, $4, $5, CURRENT_DATE, $6 FROM w ON CONFLICT (tool_call_id) DO NOTHING RETURNING id;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.worker_name, $json.toolArgs.hours_worked, ($json.toolArgs.overtime_hours ?? 0), $json.toolArgs.work_description, $json.toolCallId] }}"
+    }
+   },
+   "id": "gate-0008",
+   "name": "Exec: log_timesheet",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    520
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH cp AS (SELECT * FROM company_profile WHERE id = 1) INSERT INTO invoices (project_id, invoice_number, invoice_type, net_amount, gst_amount, pst_amount, pst_applicable, amount_due, holdback_amount, status, issued_date, due_date) SELECT p.id, $2, $3, ROUND(p.revised_contract_value * ($4 / 100.0), 2), ROUND(p.revised_contract_value * ($4 / 100.0) * cp.gst_rate, 2), CASE WHEN $5 THEN ROUND(p.revised_contract_value * ($4 / 100.0) * cp.pst_rate, 2) ELSE 0.00 END, $5, ROUND(p.revised_contract_value * ($4 / 100.0) * (1 + cp.gst_rate + CASE WHEN $5 THEN cp.pst_rate ELSE 0 END), 2), 0.00, 'DRAFT', CURRENT_DATE, CURRENT_DATE + cp.invoice_due_days * INTERVAL '1 day' FROM projects p, cp WHERE p.id = $1 RETURNING id, invoice_number, net_amount, gst_amount, pst_amount, amount_due;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.project_id, 'INV-' + Date.now(), $json.toolArgs.invoice_type, $json.toolArgs.billing_percentage, ($json.toolArgs.pst_applicable ?? false)] }}"
+    }
+   },
+   "id": "gate-0009",
+   "name": "Exec: create_invoice",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    620
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT * FROM view_project_financial_summary WHERE project_id::text = $1 OR LOWER(project_name) LIKE LOWER($2) LIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.project_id, '%' + $json.toolArgs.project_id + '%'] }}"
+    }
+   },
+   "id": "gate-0010",
+   "name": "Exec: get_project_statement",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    720
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT i.invoice_number, i.invoice_type, i.net_amount, i.gst_amount, i.pst_amount, i.amount_due, i.holdback_amount, i.issued_date, i.due_date, p.title AS project_name, c.name AS customer_name, c.email, cp.company_name, cp.email_from_name, cp.street_address, cp.city, cp.province, cp.postal_code, cp.phone, cp.signature_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM invoices i JOIN projects p ON p.id = i.project_id JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (i.id::text = $1 OR i.invoice_number = $1) LIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.invoice_id] }}"
+    }
+   },
+   "id": "gate-0011",
+   "name": "Exec: send_customer_invoice_lookup",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    820
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   },
+   "alwaysOutputData": true
+  },
+  {
+   "parameters": {
+    "jsCode": "const inv = $input.first()?.json;\nconst money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\nconst company = inv?.company_name ?? 'Ireh Construction';\nconst accent = inv?.brand_accent_color ?? '#2563eb';\nconst primary = inv?.brand_primary_color ?? '#1a3a5c';\nconst addressLine = [inv?.street_address, inv?.city, `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`].filter(Boolean).join(', ');\nconst html = `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 2rem; }\n  .header { display: flex; justify-content: space-between; border-bottom: 2px solid ${primary}; padding-bottom: 1rem; }\n  .title { font-size: 1.5rem; font-weight: 700; color: ${primary}; }\n  .co { color: #64748b; font-size: .85rem; }\n  .row { display: flex; justify-content: space-between; padding: .4rem 0; }\n  .total { font-size: 1.3rem; font-weight: 700; border-top: 2px solid ${primary}; margin-top: 1rem; padding-top: 1rem; }\n  @media print { body { margin: 0; } }\n</style></head><body>\n  <div class=\"header\">\n    <div><div class=\"title\">${company}</div><div class=\"co\">${addressLine}</div><div class=\"co\">${inv?.phone ?? ''}</div></div>\n    <div style=\"text-align:right\"><div class=\"title\">Invoice</div><div>${inv?.invoice_number ?? ''}</div><div>Issued: ${inv?.issued_date ?? ''}</div><div>Due: ${inv?.due_date ?? ''}</div></div>\n  </div>\n  <p><strong>Project:</strong> ${inv?.project_name ?? ''}</p>\n  <p><strong>Customer:</strong> ${inv?.customer_name ?? ''}</p>\n  <p><strong>Type:</strong> ${inv?.invoice_type ?? ''}</p>\n  <div class=\"row\"><span>Subtotal (net)</span><span>${money(inv?.net_amount)}</span></div>\n  ${Number(inv?.gst_amount) ? `<div class=\"row\"><span>GST</span><span>${money(inv?.gst_amount)}</span></div>` : ''}\n  ${Number(inv?.pst_amount) ? `<div class=\"row\"><span>PST</span><span>${money(inv?.pst_amount)}</span></div>` : ''}\n  <div class=\"row\"><span>Holdback</span><span>${money(inv?.holdback_amount)}</span></div>\n  <div class=\"total\">Total due ${money(inv?.amount_due)}</div>\n</body></html>`;\nreturn [{ json: { ...inv, invoiceHtml: html } }];"
+   },
+   "id": "gate-0011a",
+   "name": "Render Invoice HTML",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    960,
+    880
+   ]
+  },
+  {
+   "parameters": {
+    "resource": "message",
+    "operation": "send",
+    "sendTo": "={{ $json.email }}",
+    "subject": "={{ 'Invoice ' + $json.invoice_number + ' for ' + $json.project_name }}",
+    "emailType": "html",
+    "message": "={{ $json.invoiceHtml }}"
+   },
+   "id": "gate-0011b",
+   "name": "Exec: send_customer_invoice_email",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2,
+   "position": [
+    960,
+    940
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT p.id, p.title, p.baseline_approval_token AS approval_token FROM projects p WHERE p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%') LIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.project_id] }}"
+    }
+   },
+   "id": "gate-0014",
+   "name": "Exec: get_estimate_approval_link",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    460
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT co.id, co.change_order_number, co.approval_token, p.title AS project_name FROM change_orders co JOIN projects p ON p.id = co.project_id WHERE (p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%')) AND co.change_order_number = $2 LIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.change_order_number] }}"
+    }
+   },
+   "id": "gate-0015",
+   "name": "Exec: get_change_order_approval_link",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    560
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT p.id, p.title, p.baseline_approval_token AS token, c.name AS customer_name, c.email, cp.company_name, cp.email_from_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM projects p JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%')) LIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.project_id] }}"
+    }
+   },
+   "id": "gate-0016",
+   "name": "Exec: send_estimate_for_approval_lookup",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    640
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   },
+   "alwaysOutputData": true
+  },
+  {
+   "parameters": {
+    "jsCode": "const r = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\nconst company = r?.company_name ?? 'Ireh Construction';\nconst accent = r?.brand_accent_color ?? '#2563eb';\nconst success = r?.brand_success_color ?? '#16a34a';\nconst link = `${base}/webhook/approve-estimate?token=${r?.token ?? ''}`;\nconst html = `<!doctype html><html><body style='font-family:Helvetica,Arial,sans-serif;color:#1e293b'><h2 style='color:${accent}'>Approve your estimate</h2><p>Hi ${r?.customer_name ?? ''}, please review and approve the baseline estimate for <strong>${r?.title ?? ''}</strong>.</p><p><a href='${link}' style='display:inline-block;padding:10px 16px;background:${success};color:#fff;text-decoration:none;border-radius:6px'>Review & approve</a></p><p style='color:#64748b;margin-top:24px'>${company}</p></body></html>`;\nreturn [{ json: { ...r, html } }];"
+   },
+   "id": "gate-0016a",
+   "name": "Render Estimate Approval Email",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    960,
+    680
+   ]
+  },
+  {
+   "parameters": {
+    "resource": "message",
+    "operation": "send",
+    "sendTo": "={{ $json.email }}",
+    "subject": "={{ 'Please approve your estimate for ' + $json.title }}",
+    "emailType": "html",
+    "message": "={{ $json.html }}"
+   },
+   "id": "gate-0016b",
+   "name": "Exec: send_estimate_for_approval_email",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2,
+   "position": [
+    960,
+    720
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT co.id, co.change_order_number, co.description, co.cost_impact, co.approval_token AS token, p.title AS project_name, c.name AS customer_name, c.email, cp.company_name, cp.email_from_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM change_orders co JOIN projects p ON p.id = co.project_id JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%')) AND co.change_order_number = $2 LIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.change_order_number] }}"
+    }
+   },
+   "id": "gate-0017",
+   "name": "Exec: send_change_order_for_approval_lookup",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    780
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   },
+   "alwaysOutputData": true
+  },
+  {
+   "parameters": {
+    "jsCode": "const r = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\nconst company = r?.company_name ?? 'Ireh Construction';\nconst accent = r?.brand_accent_color ?? '#2563eb';\nconst success = r?.brand_success_color ?? '#16a34a';\nconst link = `${base}/webhook/approve-change-order?token=${r?.token ?? ''}`;\nconst amount = Number(r?.cost_impact ?? 0);\nconst sign = amount >= 0 ? '+' : '';\nconst html = `<!doctype html><html><body style='font-family:Helvetica,Arial,sans-serif;color:#1e293b'><h2 style='color:${accent}'>Approve change order #${r?.change_order_number ?? ''}</h2><p>Hi ${r?.customer_name ?? ''}, please review and approve change order #${r?.change_order_number ?? ''} for <strong>${r?.project_name ?? ''}</strong>.</p><p>${r?.description ?? ''}: ${sign}$${Math.abs(amount).toLocaleString('en-US')}</p><p><a href='${link}' style='display:inline-block;padding:10px 16px;background:${success};color:#fff;text-decoration:none;border-radius:6px'>Review & approve</a></p><p style='color:#64748b;margin-top:24px'>${company}</p></body></html>`;\nreturn [{ json: { ...r, html } }];"
+   },
+   "id": "gate-0017a",
+   "name": "Render Change Order Approval Email",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    960,
+    820
+   ]
+  },
+  {
+   "parameters": {
+    "resource": "message",
+    "operation": "send",
+    "sendTo": "={{ $json.email }}",
+    "subject": "={{ 'Please approve change order #' + $json.change_order_number + ' for ' + $json.project_name }}",
+    "emailType": "html",
+    "message": "={{ $json.html }}"
+   },
+   "id": "gate-0017b",
+   "name": "Exec: send_change_order_for_approval_email",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2,
+   "position": [
+    960,
+    860
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "jsCode": "const toolCall = $('Normalize Tool Call').first().json;\nconst dbRow = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\n\nlet spoken = 'Done.';\nswitch (toolCall.action) {\n  case 'lookup_or_create_customer':\n    spoken = 'Customer ready.';\n    break;\n  case 'create_project':\n    spoken = 'Project created.';\n    break;\n  case 'create_estimate':\n    spoken = 'Baseline estimate recorded.';\n    break;\n  case 'create_change_order':\n    spoken = dbRow && dbRow.id ? `Change order ${dbRow.change_order_number} recorded.` : 'Could not create change order - baseline estimate must be approved first.';\n    break;\n  case 'log_timesheet':\n    spoken = dbRow && dbRow.id ? 'Hours logged.' : 'Worker not found - add the worker first.';\n    break;\n  case 'create_invoice':\n    spoken = dbRow && dbRow.invoice_number ? `Draft invoice ${dbRow.invoice_number} created for $${Number(dbRow.amount_due).toLocaleString()} (incl. tax).` : 'Draft invoice created.';\n    break;\n  case 'send_customer_invoice': {\n    const row = $('Exec: send_customer_invoice_lookup').first().json;\n    spoken = row && row.email ? 'Invoice sent to the client.' : 'Invoice or customer not found.';\n    break;\n  }\n  case 'get_project_statement':\n    spoken = dbRow\n      ? `${dbRow.project_name} (${dbRow.customer_name}): Revised contract is $${Number(dbRow.total_revised_contract_value).toLocaleString()}, $${Number(dbRow.total_paid).toLocaleString()} collected. Outstanding balance is $${Number(dbRow.balance_remaining).toLocaleString()}.`\n      : 'Project not found.';\n    break;\n  case 'get_estimate_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-estimate?token=${dbRow.approval_token}` : 'Project not found.';\n    break;\n  case 'get_change_order_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-change-order?token=${dbRow.approval_token}` : 'Change order not found.';\n    break;\n  case 'send_estimate_for_approval': {\n    const row = $('Exec: send_estimate_for_approval_lookup').first().json;\n    spoken = row && row.email ? 'Approval link emailed to the client.' : 'Project or customer not found.';\n    break;\n  }\n  case 'send_change_order_for_approval': {\n    const row = $('Exec: send_change_order_for_approval_lookup').first().json;\n    spoken = row && row.email ? 'Change order approval link emailed to the client.' : 'Change order not found.';\n    break;\n  }\n  case 'record_payment':\n    spoken = dbRow && dbRow.invoice_number\n      ? `Payment recorded. ${dbRow.invoice_number} is now ${(dbRow.status || '').toLowerCase()}; balance due $${Number(dbRow.balance_due).toLocaleString()}.`\n      : 'Invoice not found.';\n    break;\n  case 'run_payroll':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll computed for ${dbRow.period_start} to ${dbRow.period_end}: ${dbRow.workers} worker(s), $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net.`\n      : 'No timesheets found for that period.';\n    break;\n  case 'get_payroll_summary':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll for ${dbRow.period_start} to ${dbRow.period_end}: $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net (${dbRow.workers} workers).`\n      : 'No payroll run found.';\n    break;\n  case 'add_worker':\n    spoken = dbRow && dbRow.worker_code\n      ? `Worker ${dbRow.name} added as ${dbRow.worker_code}${dbRow.trade ? ' (' + dbRow.trade + ')' : ''}.`\n      : 'Could not add worker.';\n    break;\n  case 'get_dashboard_summary': {\n    const rows = $input.all().map(i => i.json);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name}: contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_projects': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.project_name);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name} (${r.project_status}): contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_invoices': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.invoice_number);\n    if (!rows.length) { spoken = 'No invoices found.'; }\n    else {\n      spoken = rows.map(r => `${r.invoice_number} ${r.project_name}: $${Number(r.amount_due).toLocaleString()} (${r.status}), balance $${Number(r.balance_due).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'get_schedule': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.title);\n    if (!rows.length) { spoken = 'Nothing scheduled in that window.'; }\n    else {\n      spoken = rows.map(r => {\n        let when = 'no date';\n        if (r.due_date) {\n          const parts = String(r.due_date).slice(0, 10).split('-').map(Number);\n          if (parts.length === 3 && parts.every(n => !isNaN(n))) {\n            const due = new Date(parts[0], parts[1] - 1, parts[2]);\n            const now = new Date(); now.setHours(0, 0, 0, 0);\n            const diff = Math.round((due - now) / 86400000);\n            when = diff < 0 ? (Math.abs(diff) + ' days overdue') : diff === 0 ? 'today' : diff === 1 ? 'tomorrow' : ('in ' + diff + ' days');\n          }\n        }\n        return `${r.title} ${when}${r.project_name ? ' (' + r.project_name + ')' : ''}`;\n      }).join('. ');\n    }\n    break;\n  }\n  case 'set_briefing_time': {\n    spoken = dbRow && dbRow.briefing_time ? `Daily briefing set to ${String(dbRow.briefing_time).slice(0, 5)}.` : 'Could not update briefing time.';\n    break;\n  }\n  case 'get_onboarding_status':\n    spoken = dbRow && dbRow.setup_completed\n      ? `Setup is complete. ${dbRow.company_name}, ${dbRow.worker_count} active worker${dbRow.worker_count === 1 ? '' : 's'} on file.`\n      : 'Setup is not complete yet. Let us start - what is the company name?';\n    break;\n  case 'complete_onboarding':\n    spoken = dbRow && dbRow.company_name\n      ? `All set, ${dbRow.pm_preferred_name || 'boss'}. ${dbRow.company_name} is registered with ${dbRow.worker_count} worker${dbRow.worker_count === 1 ? '' : 's'} on file. Anything else?`\n      : 'Setup did not complete. Please try again.';\n    break;\n  default:\n    spoken = `I'm not sure how to handle \"${toolCall.action}\". Please rephrase, or ask for something like project status, estimates, invoices, payments, or payroll.`;\n}\n\nreturn [{\n  json: {\n    toolCallId: toolCall.toolCallId,\n    result: spoken,\n  },\n}];"
+   },
+   "id": "gate-0012",
+   "name": "Format Spoken Result",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1220,
+    420
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ { results: [{ toolCallId: $json.toolCallId, result: $json.result }] } }}",
+    "options": {
+     "responseCode": 200
+    }
+   },
+   "id": "gate-0013",
+   "name": "Respond Vapi",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1,
+   "position": [
+    1500,
+    420
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH inv AS (SELECT id FROM invoices WHERE invoice_number = $1 OR id::text = $1 LIMIT 1) INSERT INTO payments (invoice_id, payment_date, amount, method, notes, tool_call_id) SELECT inv.id, COALESCE($3::date, CURRENT_DATE), $2, $4, $5, $6 FROM inv ON CONFLICT (tool_call_id) DO NOTHING RETURNING invoice_id;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.invoice_number, $json.toolArgs.amount, ($json.toolArgs.payment_date ?? null), ($json.toolArgs.method ?? null), ($json.toolArgs.notes ?? null), $json.toolCallId] }}"
+    }
+   },
+   "id": "gate-0020",
+   "name": "Exec: record_payment",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    980
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH vp AS (SELECT total_paid, balance_due, due_date FROM view_invoice_payments WHERE invoice_id = $1), upd AS (UPDATE invoices i SET status = CASE WHEN i.status = 'DRAFT' THEN i.status WHEN vp.total_paid = 0 THEN CASE WHEN vp.due_date < CURRENT_DATE THEN 'OVERDUE' ELSE 'UNPAID' END WHEN vp.balance_due <= 0 THEN 'PAID' ELSE 'PARTIAL' END FROM vp WHERE i.id = $1 RETURNING i.invoice_number, i.status) SELECT upd.invoice_number, upd.status, vp.total_paid, vp.balance_due FROM upd CROSS JOIN vp;",
+    "options": {
+     "queryReplacement": "={{ [$json.invoice_id] }}"
+    }
+   },
+   "id": "gate-0021",
+   "name": "Exec: record_payment_status",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    1040
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT * FROM fn_run_payroll($1::date, $2::int);",
+    "options": {
+     "queryReplacement": "={{ [($json.toolArgs.period_end ?? null), ($json.toolArgs.days ?? null)] }}"
+    }
+   },
+   "id": "gate-0022",
+   "name": "Exec: run_payroll",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    1100
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT * FROM view_payroll_summary WHERE ($1::date IS NULL OR period_end = $1::date) ORDER BY period_end DESC LIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [($json.toolArgs.period_end ?? null)] }}"
+    }
+   },
+   "id": "gate-0023",
+   "name": "Exec: get_payroll_summary",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    1160
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "INSERT INTO workers (worker_code, name, trade, hourly_rate, overtime_rate) SELECT COALESCE($1, (SELECT 'W-' || LPAD(COALESCE(MAX(SUBSTRING(worker_code FROM '([0-9]+)')::int), 0) + 1, 3, '0') FROM workers WHERE worker_code ~ '^W-[0-9]+$')), $2, $3, $4, $5 ON CONFLICT (worker_code) DO UPDATE SET name = EXCLUDED.name, trade = EXCLUDED.trade, hourly_rate = EXCLUDED.hourly_rate, overtime_rate = EXCLUDED.overtime_rate RETURNING id, worker_code, name, trade, hourly_rate, overtime_rate;",
+    "options": {
+     "queryReplacement": "={{ [($json.toolArgs.worker_code ?? null), $json.toolArgs.name, ($json.toolArgs.trade ?? null), $json.toolArgs.hourly_rate, ($json.toolArgs.overtime_rate ?? null)] }}"
+    }
+   },
+   "id": "gate-0024",
+   "name": "Exec: add_worker",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    1220
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT * FROM view_project_financial_summary WHERE ($1::text IS NULL OR project_id::text = $1 OR LOWER(project_name) LIKE LOWER('%' || $1 || '%'));",
+    "options": {
+     "queryReplacement": "={{ [($json.toolArgs.project_id ?? null)] }}"
+    }
+   },
+   "id": "gate-0025",
+   "name": "Exec: get_dashboard_summary",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    1280
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT * FROM view_project_financial_summary WHERE ($1::text IS NULL OR LOWER(project_status) = LOWER($1)) ORDER BY project_name;",
+    "options": {
+     "queryReplacement": "={{ [($json.toolArgs.status ?? null)] }}"
+    }
+   },
+   "id": "gate-0026",
+   "name": "Exec: list_projects",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    1520
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   },
+   "alwaysOutputData": true
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT i.invoice_number, p.title AS project_name, c.name AS customer_name, i.amount_due, vp.total_paid, vp.balance_due, i.due_date, i.status FROM invoices i JOIN projects p ON p.id = i.project_id JOIN customers c ON c.id = p.customer_id JOIN view_invoice_payments vp ON vp.invoice_id = i.id WHERE ($1::text IS NULL OR LOWER(i.status) = LOWER($1)) ORDER BY i.due_date DESC;",
+    "options": {
+     "queryReplacement": "={{ [($json.toolArgs.status ?? null)] }}"
+    }
+   },
+   "id": "gate-0027",
+   "name": "Exec: list_invoices",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    1560
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   },
+   "alwaysOutputData": true
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "has-email-(estimate)",
+       "leftValue": "={{ $json.email }}",
+       "rightValue": "",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "gate-0031",
+   "name": "Has Email (Estimate)",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2,
+   "position": [
+    1220,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "has-email-(change-order)",
+       "leftValue": "={{ $json.email }}",
+       "rightValue": "",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "gate-0032",
+   "name": "Has Email (Change Order)",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2,
+   "position": [
+    1220,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "has-email-(invoice)",
+       "leftValue": "={{ $json.email }}",
+       "rightValue": "",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "gate-0033",
+   "name": "Has Email (Invoice)",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2,
+   "position": [
+    1220,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT * FROM view_schedule WHERE status <> 'DONE' AND (due_date IS NULL OR due_date <= CURRENT_DATE + ($1::int || ' days')::interval) ORDER BY due_date NULLS LAST, due_time NULLS LAST;",
+    "options": {
+     "queryReplacement": "={{ [($json.toolArgs.days ?? 7)] }}"
+    }
+   },
+   "id": "gate-0034",
+   "name": "Exec: get_schedule",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "alwaysOutputData": true,
+   "position": [
+    960,
+    1800
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "UPDATE company_profile SET briefing_time = $1::time WHERE id = 1 RETURNING briefing_time;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.time] }}"
+    }
+   },
+   "id": "gate-0035",
+   "name": "Exec: set_briefing_time",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "alwaysOutputData": true,
+   "position": [
+    960,
+    1840
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT token FROM device_tokens ORDER BY created_at;",
+    "options": {},
+    "alwaysOutputData": true
+   },
+   "id": "gate-sched-tokens",
+   "name": "Exec: get_device_tokens",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    1240,
+    1840
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "jsCode": "// Push Briefing Time Change (runs after set_briefing_time UPDATE + get_device_tokens).\n// Sends an FCM data message {type:\"briefing_time_changed\", briefing_time} to every\n// registered device so the app re-schedules its local notification (no tap needed).\n// Key sources (in order): FCM_SERVICE_ACCOUNT_FILE (mounted secrets file) or\n// FCM_SERVICE_ACCOUNT_JSON (single-line env). Needs NODE_FUNCTION_ALLOW_BUILTIN=crypto,fs,https\n// (n8n 2.35 task-runner allowlist env; $helpers does NOT exist in 2.35 Code nodes).\nconst briefingTime = String($('Exec: set_briefing_time').first().json.briefing_time || '').slice(0, 5);\nconst tokens = $input.all().map(i => i.json).filter(r => r && r.token).map(r => r.token);\nlet saRaw = String($env.FCM_SERVICE_ACCOUNT_JSON || '').trim();\nlet keyNote = '';\nif (!saRaw) {\n  try {\n    const file = String($env.FCM_SERVICE_ACCOUNT_FILE || '').trim();\n    if (file) saRaw = require('fs').readFileSync(file, 'utf8').trim();\n  } catch (e) {\n    keyNote = 'FCM key file read failed: ' + e.message;\n  }\n}\n\nlet pushed = 0;\nlet note = keyNote || 'FCM not configured (FCM_SERVICE_ACCOUNT_JSON/FILE unset); push skipped';\nif (!saRaw) {\n  // no key — note already explains (unset or file read failure)\n} else if (tokens.length === 0) {\n  note = 'no registered devices';\n} else {\n  try {\n    const sa = JSON.parse(saRaw);\n    const crypto = require('crypto');\n    const accessToken = await getAccessToken(sa, crypto);\n    for (const token of tokens) {\n      await sendFcm(accessToken, sa.project_id, token, { type: 'briefing_time_changed', briefing_time: briefingTime });\n      pushed++;\n    }\n    note = 'pushed to ' + pushed + ' device(s)';\n  } catch (e) {\n    note = 'FCM send failed: ' + e.message;\n  }\n}\n\nreturn [{ json: { briefing_time: briefingTime, pushed, note } }];\n\nfunction b64url(s) {\n  return s.replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n}\n\nfunction splitUrl(u) {\n  const m = u.match(/^https?:\\/\\/([^/]+)(\\/[^?#]*)?(\\?[^#]*)?/);\n  return { hostname: m[1], path: (m[2] || '/') + (m[3] || '') };\n}\n\nfunction httpsRequest(options, body) {\n  return new Promise((resolve, reject) => {\n    const req = require('https').request(options, (res) => {\n      let data = '';\n      res.on('data', (c) => (data += c));\n      res.on('end', () => resolve({ status: res.statusCode, body: data }));\n    });\n    req.on('error', reject);\n    req.write(body);\n    req.end();\n  });\n}\n\nasync function getAccessToken(sa, crypto) {\n  const now = Math.floor(Date.now() / 1000);\n  const head = b64url(Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64'));\n  const claim = b64url(Buffer.from(JSON.stringify({\n    iss: sa.client_email,\n    scope: 'https://www.googleapis.com/auth/firebase.messaging',\n    aud: sa.token_uri,\n    iat: now,\n    exp: now + 3600\n  })).toString('base64'));\n  const input = head + '.' + claim;\n  const sig = b64url(crypto.createSign('RSA-SHA256').update(input).sign(sa.private_key).toString('base64'));\n  const jwt = input + '.' + sig;\n  const u = splitUrl(sa.token_uri);\n  const resp = await httpsRequest({\n    method: 'POST',\n    hostname: u.hostname,\n    path: u.path,\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n  }, 'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=' + encodeURIComponent(jwt));\n  const parsed = JSON.parse(resp.body);\n  if (!parsed.access_token) {\n    throw new Error('token exchange failed (' + resp.status + '): ' + resp.body.slice(0, 200));\n  }\n  return parsed.access_token;\n}\n\nasync function sendFcm(accessToken, projectId, token, data) {\n  const u = splitUrl('https://fcm.googleapis.com/v1/projects/' + projectId + '/messages:send');\n  const resp = await httpsRequest({\n    method: 'POST',\n    hostname: u.hostname,\n    path: u.path,\n    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },\n  }, JSON.stringify({ message: { token, data } }));\n  if (resp.status >= 400) {\n    throw new Error('FCM HTTP ' + resp.status + ': ' + resp.body.slice(0, 200));\n  }\n}\n",
+    "mode": "runOnceForAllItems"
+   },
+   "id": "gate-sched-push",
+   "name": "Push Briefing Time Change",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1500,
+    1840
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT cp.company_name,\n       cp.pm_name,\n       cp.pm_preferred_name,\n       (cp.setup_completed_at IS NOT NULL) AS setup_completed,\n       (SELECT count(*) FROM workers WHERE active) AS worker_count\n  FROM company_profile cp WHERE id = 1;",
+    "options": {
+     "queryReplacement": "={{ [] }}"
+    }
+   },
+   "id": "gate-0036",
+   "name": "Exec: get_onboarding_status",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "alwaysOutputData": true,
+   "position": [
+    960,
+    1960
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH incoming AS (\n  SELECT lower(btrim(w.name)) AS name_key, btrim(w.name) AS name,\n         nullif(btrim(w.trade), '') AS trade,\n         nullif(w.hourly_rate, '')::numeric AS hourly_rate\n  FROM jsonb_to_recordset($1::jsonb) AS w(name text, trade text, hourly_rate text)\n),\nupserted AS (\n  UPDATE workers w\n     SET trade = i.trade,\n         hourly_rate = COALESCE(i.hourly_rate, w.hourly_rate),\n         active = TRUE\n    FROM incoming i\n   WHERE lower(w.name) = i.name_key\n  RETURNING w.id\n),\nadded AS (\n  INSERT INTO workers (name, trade, hourly_rate, worker_code)\n  SELECT i.name, i.trade, i.hourly_rate,\n         'W-' || lpad((b.max_code + row_number() OVER ())::text, 3, '0')\n    FROM incoming i\n    CROSS JOIN (SELECT COALESCE(max(NULLIF(regexp_replace(worker_code, '\\D', '', 'g'), '')::int), 0) AS max_code\n                  FROM workers) b\n   WHERE NOT EXISTS (SELECT 1 FROM workers w WHERE lower(w.name) = i.name_key)\n  RETURNING id\n)\nSELECT (SELECT count(*) FROM incoming) AS requested,\n       (SELECT count(*) FROM upserted) AS updated,\n       (SELECT count(*) FROM added)    AS added,\n       (SELECT count(*) FROM workers WHERE active) AS total_workers;",
+    "options": {
+     "queryReplacement": "={{ [JSON.stringify($json.toolArgs.workers ?? [])] }}"
+    }
+   },
+   "id": "gate-0037",
+   "name": "Exec: complete_onboarding_workers",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "alwaysOutputData": true,
+   "position": [
+    960,
+    2040
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "UPDATE company_profile\n   SET company_name       = COALESCE(NULLIF($1, ''), company_name),\n       pm_name            = COALESCE(NULLIF($2, ''), pm_name),\n       pm_preferred_name  = COALESCE(NULLIF($3, ''), pm_preferred_name),\n       setup_completed_at = COALESCE(setup_completed_at, now()),\n       updated_at         = now()\n WHERE id = 1\nRETURNING company_name, pm_name, pm_preferred_name,\n          (SELECT count(*) FROM workers WHERE active) AS worker_count;",
+    "options": {
+     "queryReplacement": "={{ [($('Normalize Tool Call').first().json.toolArgs.company_name ?? null), ($('Normalize Tool Call').first().json.toolArgs.pm_name ?? null), ($('Normalize Tool Call').first().json.toolArgs.preferred_name ?? null)] }}"
+    }
+   },
+   "id": "gate-0038",
+   "name": "Exec: complete_onboarding_profile",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "alwaysOutputData": true,
+   "position": [
+    960,
+    2120
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Voice Gateway Webhook": {
+   "main": [
+    [
+     {
+      "node": "Normalize Tool Call",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Normalize Tool Call": {
+   "main": [
+    [
+     {
+      "node": "Actions Sub-Router",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Actions Sub-Router": {
+   "main": [
+    [
+     {
+      "node": "Exec: lookup_or_create_customer",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: create_project",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: create_estimate",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: create_change_order",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: log_timesheet",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: create_invoice",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: send_customer_invoice_lookup",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: get_project_statement",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: get_estimate_approval_link",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: get_change_order_approval_link",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: send_estimate_for_approval_lookup",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: send_change_order_for_approval_lookup",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: record_payment",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: run_payroll",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: get_payroll_summary",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: add_worker",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: get_dashboard_summary",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: list_projects",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: list_invoices",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: get_schedule",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: set_briefing_time",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: get_onboarding_status",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: complete_onboarding_workers",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: lookup_or_create_customer": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: create_project": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: create_estimate": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: create_change_order": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: log_timesheet": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: create_invoice": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: send_customer_invoice_lookup": {
+   "main": [
+    [
+     {
+      "node": "Has Email (Invoice)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Render Invoice HTML": {
+   "main": [
+    [
+     {
+      "node": "Exec: send_customer_invoice_email",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: send_customer_invoice_email": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: get_project_statement": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: get_estimate_approval_link": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: get_change_order_approval_link": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: send_estimate_for_approval_lookup": {
+   "main": [
+    [
+     {
+      "node": "Has Email (Estimate)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Render Estimate Approval Email": {
+   "main": [
+    [
+     {
+      "node": "Exec: send_estimate_for_approval_email",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: send_estimate_for_approval_email": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: send_change_order_for_approval_lookup": {
+   "main": [
+    [
+     {
+      "node": "Has Email (Change Order)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Render Change Order Approval Email": {
+   "main": [
+    [
+     {
+      "node": "Exec: send_change_order_for_approval_email",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: send_change_order_for_approval_email": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Format Spoken Result": {
+   "main": [
+    [
+     {
+      "node": "Respond Vapi",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: record_payment": {
+   "main": [
+    [
+     {
+      "node": "Exec: record_payment_status",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: record_payment_status": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: run_payroll": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: get_payroll_summary": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: add_worker": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: get_dashboard_summary": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: list_projects": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: list_invoices": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Has Email (Estimate)": {
+   "main": [
+    [
+     {
+      "node": "Render Estimate Approval Email",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Has Email (Change Order)": {
+   "main": [
+    [
+     {
+      "node": "Render Change Order Approval Email",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Has Email (Invoice)": {
+   "main": [
+    [
+     {
+      "node": "Render Invoice HTML",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: get_schedule": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: set_briefing_time": {
+   "main": [
+    [
+     {
+      "node": "Exec: get_device_tokens",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: get_device_tokens": {
+   "main": [
+    [
+     {
+      "node": "Push Briefing Time Change",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Push Briefing Time Change": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: get_onboarding_status": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: complete_onboarding_workers": {
+   "main": [
+    [
+     {
+      "node": "Exec: complete_onboarding_profile",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: complete_onboarding_profile": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "id": "5Dswa943KQF0rnZ1"
 }

@@ -14,7 +14,7 @@
   },
   "firstMessage": "Hi, I'm your construction project assistant. You can log site hours, record payments, run payroll, or ask for a project statement.",
   "endCallMessage": "Anything else, just call me back.",
-  "systemPrompt": "# Role & Context\nYou are an executive voice project assistant managing 3-4 construction sites. You\ninteract with database systems via tool calls to manage Customers, Projects,\nEstimates, Change Orders, Invoices, and Payroll.\n\n# Rules of Operations & Logic\n1. Customer First: Before creating a project, verify or create the Customer record\n   using `lookup_or_create_customer`.\n2. Estimates vs Change Orders:\n   - Base scope = `create_estimate` (sets the baseline contract value).\n   - Any modifications after initial setup = `create_change_order`.\n   - NEVER overwrite the baseline estimate.\n3. Invoicing: Invoices may include progress percentages of the base estimate OR\n   specific approved change orders as distinct line items.\n4. Communication Style:\n   - Speak in clear, short sentences (10-15 words max).\n   - Confirm critical details (Customer Name, Project Name, Dollar Amounts) before\n     executing tools.\n   - Summarize tool execution outcomes in a single sentence.",
+  "systemPrompt": "# Role & Context\nYou are an executive voice project assistant managing 3-4 construction sites. You\ninteract with database systems via tool calls to manage Customers, Projects,\nEstimates, Change Orders, Invoices, and Payroll.\n\n# Rules of Operations & Logic\n1. Customer First: Before creating a project, verify or create the Customer record\n   using `lookup_or_create_customer`.\n2. Estimates vs Change Orders:\n   - Base scope = `create_estimate` (sets the baseline contract value).\n   - Any modifications after initial setup = `create_change_order`.\n   - NEVER overwrite the baseline estimate.\n3. Invoicing: Invoices may include progress percentages of the base estimate OR\n   specific approved change orders as distinct line items.\n4. Communication Style:\n   - Speak in clear, short sentences (10-15 words max).\n   - Confirm critical details (Customer Name, Project Name, Dollar Amounts) before\n     executing tools.\n   - Summarize tool execution outcomes in a single sentence.\n# First-Run Setup (Onboarding)\n- At the start of a conversation, if you do not already know whether setup is\n  complete, call `get_onboarding_status` once.\n- If setup is NOT complete, run the onboarding flow BEFORE any other work:\n  1. Ask for the company name.\n  2. Ask for the project manager's full name.\n  3. Ask how the PM wants to be addressed every day (e.g. \"Dave\" or \"boss\").\n  4. Ask for each worker's name, trade, and hourly rate, one at a time\n     (ask \"anyone else?\" until they say no).\n  5. When you have everything, call `complete_onboarding` with all fields\n     (workers as an array), then confirm: \"All set - everything is registered.\"\n- Keep each question short (10-15 words). Never call `complete_onboarding`\n  before you have company name, PM name, preferred address, and the worker\n  list (an empty workers array is allowed only if they have no crew yet).\n- If setup IS complete, never re-run onboarding unless the user asks to\n  change company details; use `add_worker` for new crew members.\n",
   "tools": [
     {
       "type": "function",
@@ -650,6 +650,81 @@
           },
           "required": [
             "time"
+          ]
+        }
+      },
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_onboarding_status",
+        "description": "Returns whether first-run setup is complete, plus the company name, PM name, preferred daily address, and active worker count.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "server": {
+        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+        "timeoutSeconds": 15
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "complete_onboarding",
+        "description": "Completes first-run setup: records company name, PM full name, how the PM wants to be addressed daily, and the worker list (name, trade, hourly rate). Call ONLY after gathering all fields from the user.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "company_name": {
+              "type": "string",
+              "description": "Company name"
+            },
+            "pm_name": {
+              "type": "string",
+              "description": "Project manager full name"
+            },
+            "preferred_name": {
+              "type": "string",
+              "description": "How the PM wants to be addressed every day, e.g. Dave or boss"
+            },
+            "workers": {
+              "type": "array",
+              "description": "Crew members: name, trade, hourly rate",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Full worker name"
+                  },
+                  "trade": {
+                    "type": "string",
+                    "description": "Trade, e.g. Framer, Electrician, Labourer"
+                  },
+                  "hourly_rate": {
+                    "type": "number",
+                    "description": "Hourly rate in dollars"
+                  }
+                },
+                "required": [
+                  "name",
+                  "hourly_rate"
+                ]
+              }
+            }
+          },
+          "required": [
+            "company_name",
+            "pm_name",
+            "preferred_name",
+            "workers"
           ]
         }
       },

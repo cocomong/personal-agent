@@ -943,3 +943,46 @@ Why this shape:
 - Fallback: on every launch/resume the app re-reads `briefing_time` and
   re-schedules if it drifted, so the worst case is "takes effect next open".
 
+---
+
+## 15. First-Run Onboarding Wizard
+
+Built 2026-08-29 (db/0016 + gateway branches + Vapi prompt; Vapi sync pending
+the API key). Full notes + decisions: `doc/ONBOARDING_WIZARD_NOTES.md`.
+
+### 15.1 Purpose
+A voice first-run flow that captures: company name, PM full name, how the PM
+wants to be addressed daily ("Dave" / "boss"), and the crew (name, trade,
+hourly rate). Before setup completes, the assistant's system prompt directs it
+to run onboarding before any other work.
+
+### 15.2 Conversation design (decision D1)
+System-prompt-driven, NOT a DB state machine: the LLM holds the multi-turn
+conversation inside the Vapi session and calls ONE completion tool at the end.
+`get_onboarding_status` (no args) tells the assistant whether setup is done —
+it returns `setup_completed`, company name, PM name, preferred name, and the
+active worker count.
+
+### 15.3 Data model (decision D3)
+`company_profile` gains `pm_name`, `pm_preferred_name`, `setup_completed_at`
+(NULL = pending). Workers upsert into the existing `workers` table by
+case-insensitive name (no schema change, decision D4). Re-runs are idempotent
+and keep the original `setup_completed_at` (decision D6).
+
+### 15.4 Gateway branches
+- `get_onboarding_status` → single-row SELECT on `company_profile`.
+- `complete_onboarding(company_name, pm_name, preferred_name, workers[])` →
+  worker upsert (update-or-insert, auto `W-###` codes) then
+  `UPDATE company_profile ... RETURNING` with the final active worker count.
+
+### 15.5 Tool contract
+| Tool | Args | Returns (spoken) |
+|---|---|---|
+| `get_onboarding_status` | — | "Setup is not complete yet. Let us start - what is the company name?" / "Setup is complete. {company}, {N} active workers on file." |
+| `complete_onboarding` | company_name, pm_name, preferred_name, workers[{name, trade, hourly_rate}] | "All set, {preferred}. {company} is registered with {N} workers on file." |
+
+### 15.6 Verified
+Live webhook tests passed: status, full onboarding (2 workers, auto codes
+W-003/W-004), empty-crew, re-run idempotency. Test data cleaned up afterwards
+so the first real call performs the real onboarding.
+

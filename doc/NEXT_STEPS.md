@@ -21,10 +21,20 @@
 1. **Capabilities KB (Vapi)** — instruction manual / self-introduction of the whole
    assistant: the 21 tools, native SMS, email approvals. Upload as a Vapi Knowledge Base
    (see the `vapi-kb-tool` skill).
-2. **Initial-setup onboarding wizard** — first-run flow capturing: company name, PM name +
-   how the PM wants to be addressed daily (e.g. "Dave" / "boss"), and workers (name + trade
-   + hourly rate). `workers` table exists (db/0001); `company_profile` has `signature_name`
-   but likely needs a new column for the PM preferred-name/greeting.
+2. **Initial-setup onboarding wizard — BUILT + LIVE on the n8n/DB side (2026-08-29)** —
+   first-run flow capturing: company name, PM name + daily preferred address ("Dave"/"boss"),
+   and workers (name + trade + hourly rate). db/0016 (pm_name, pm_preferred_name,
+   setup_completed_at) applied; gateway branches `get_onboarding_status` + `complete_onboarding`
+   (23 tools) live + verified; test data cleaned up so the first real call runs onboarding.
+   **Still needed: sync Vapi assistant** (`VAPI_PRIVATE_KEY=... python3 backend/create_vapi_assistant.py`
+   — config staged in backend/vapi_assistant.json). Notes + decisions:
+   `doc/ONBOARDING_WIZARD_NOTES.md`, SYSTEM_DESIGN.md §15.
+3. **Deadline Reminder workflow (n8n)** — the passive nudges from build-order item 5
+   (Aug 26): lien/holdback reminders at 7/3/1 day, lead-time "order materials" nudges,
+   same-day inspections. DB layer exists (`view_schedule` + lien/holdback clocks in 0014);
+   NO workflow file exists yet. Email first, FCM push bolts on later.
+4. **Real phone call test** — Vapi assistant (id 67e2850c-…, webhook voice/gateway) has
+   never had a real inbound call. Make a real call and confirm the full voice loop.
 
 ---
 

@@ -16,7 +16,7 @@ Target assistant voice + text is **voice-primary, text-secondary** on the **same
 > python3 backend/create_vapi_assistant.py   # creates or updates, safe to re-run
 > ```
 >
-> It reads `backend/vapi_assistant.json` (model, voice, system prompt, 17
+> It reads `backend/vapi_assistant.json` (model, voice, system prompt, 23
 > server tools). The script adapts the JSON to the Vapi API's modern shape:
 > the system prompt goes into `model.messages`, and tools are upserted as
 > standalone **tool resources** referenced by `model.toolIds`. To change any
@@ -81,6 +81,15 @@ Estimates, Change Orders, Invoices, and Payroll.
      executing tools.
    - Summarize tool execution outcomes in a single sentence.
 ```
+
+> **Onboarding (first-run setup).** The current system prompt in
+> `backend/vapi_assistant.json` additionally contains a "First-Run Setup
+> (Onboarding)" section: call `get_onboarding_status` when setup state is
+> unknown; if incomplete, walk the user through company name → PM name → daily
+> preferred address → workers (one at a time) and finish with
+> `complete_onboarding`. See `doc/ONBOARDING_WIZARD_NOTES.md` (decisions) and
+> SYSTEM_DESIGN.md §15 (design). The n8n side is live; **sync Vapi** with
+> `VAPI_PRIVATE_KEY=... python3 backend/create_vapi_assistant.py`.
 
 ---
 
@@ -152,7 +161,7 @@ The app creates `VapiClient(VAPI_PUBLIC_KEY)`, calls `start(ASSISTANT_ID)` for v
 - [x] Voice configured — `vapi`/Elliot (ADR-9 specified 11labs; edit `voice` in `backend/vapi_assistant.json` if an ElevenLabs voiceId is preferred)
 - [x] Model locked — `openai/gpt-4.1-mini`, temperature 0.2
 - [x] System prompt (Section 6) configured (`model.messages` in this API version)
-- [x] 17 function tools added (12 original + 5 new), all → n8n `/voice/gateway`
+- [x] 23 function tools added (12 original + 5 new + get_schedule/set_briefing_time + get_onboarding_status/complete_onboarding), all → n8n `/voice/gateway`
 - [ ] n8n gateway deployed + webhook URL reachable from Vapi
 - [ ] DB migrated (`db/0001` → `0011`); test data loaded (`db/0003_seed.sql` + `db/0012_seed_v2.sql`);
       idempotency verified (`db/0002_idempotency_test.sql` + `db/0013_verification.sql`)
