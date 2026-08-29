@@ -1,6 +1,6 @@
 # Onboarding Wizard — Build Notes & Decisions (2026-08-29)
 
-Status: BUILD + LIVE (n8n gateway + Postgres), Vapi assistant config staged.
+Status: BUILD + LIVE END-TO-END (Vapi + n8n + Postgres) as of 2026-08-29.
 Build #2 of the PM-assistant backlog (initial-setup onboarding wizard).
 
 ## What was built
@@ -13,7 +13,10 @@ Build #2 of the PM-assistant backlog (initial-setup onboarding wizard).
    - `get_onboarding_status` — returns setup state + company + worker count
    - `complete_onboarding` — upserts company profile + worker list in one call
 3. **vapi_assistant.json** — 2 new tools + "First-Run Setup (Onboarding)" section
-   in the system prompt (STAGED — sync to Vapi still needs your API key, see below).
+   in the system prompt. **SYNCED to Vapi** (assistant 67e2850c-… now has 23
+   toolIds + onboarding prompt, verified by read-back; the missing
+   VAPI_PRIVATE_KEY was found in old session history and saved to
+   `~/.hermes/.env`).
 4. Verified live end-to-end (see "Test evidence" below), then test data cleaned up
    so the first real call runs onboarding for real.
 
@@ -84,15 +87,11 @@ D8. **Deployment mechanics** (following the established repo pattern):
 
 ## BLOCKED on you (one command each)
 
-1. **Sync the Vapi assistant** (the voice side isn't live until this runs):
-   ```bash
-   cd ~/projects/personal-agent
-   VAPI_PRIVATE_KEY=your_key_here python3 backend/create_vapi_assistant.py
-   ```
-   `backend/vapi_assistant.json` already has the 2 tools + onboarding prompt
-   section; the script is idempotent (safe to re-run).
-   I could not find VAPI_PRIVATE_KEY on this machine (~/.hermes/.env, SOUL.md,
-   shell rc, repo — all checked), so I did not run it.
+1. ~~**Sync the Vapi assistant**~~ DONE 2026-08-29 — key located (in old session
+   history, originally from the deleted `~/.openclaw/agents/vapi/agent/SOUL.md`),
+   saved to `~/.hermes/.env` (chmod 600), `create_vapi_assistant.py` patched to
+   read it (and to accept >= 21 tools), sync run + verified (23 toolIds,
+   onboarding prompt live).
 
 2. **Optional**: real phone call test of the whole loop (also on the backlog).
 

@@ -83,13 +83,13 @@ Estimates, Change Orders, Invoices, and Payroll.
 ```
 
 > **Onboarding (first-run setup).** The current system prompt in
-> `backend/vapi_assistant.json` additionally contains a "First-Run Setup
-> (Onboarding)" section: call `get_onboarding_status` when setup state is
-> unknown; if incomplete, walk the user through company name → PM name → daily
-> preferred address → workers (one at a time) and finish with
-> `complete_onboarding`. See `doc/ONBOARDING_WIZARD_NOTES.md` (decisions) and
-> SYSTEM_DESIGN.md §15 (design). The n8n side is live; **sync Vapi** with
-> `VAPI_PRIVATE_KEY=... python3 backend/create_vapi_assistant.py`.
+> `backend/vapi_assistant.json` contains a "First-Run Setup (Onboarding)"
+> section: call `get_onboarding_status` when setup state is unknown; if
+> incomplete, walk the user through company name → PM name → daily preferred
+> address → workers (one at a time) and finish with `complete_onboarding`.
+> See `doc/ONBOARDING_WIZARD_NOTES.md` (decisions) and SYSTEM_DESIGN.md §15
+> (design). **LIVE end-to-end** — assistant synced to 23 tools; the deployer
+> (`create_vapi_assistant.py`) reads `VAPI_PRIVATE_KEY` from `~/.hermes/.env`.
 
 ---
 

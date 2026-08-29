@@ -39,12 +39,18 @@ def api_key() -> str:
     key = os.environ.get("VAPI_PRIVATE_KEY")
     if key:
         return key
+    # Canonical secret home (Hermes convention): ~/.hermes/.env
+    env_file = Path.home() / ".hermes" / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            if line.startswith("VAPI_PRIVATE_KEY="):
+                return line.split("=", 1)[1].strip()
     soul = Path.home() / ".openclaw" / "agents" / "vapi" / "agent" / "SOUL.md"
     if soul.exists():
         m = re.search(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", soul.read_text())
         if m:
             return m.group(0)
-    sys.exit("error: VAPI_PRIVATE_KEY not set and no key found in SOUL.md")
+    sys.exit("error: VAPI_PRIVATE_KEY not set and no key found in ~/.hermes/.env or SOUL.md")
 
 
 def request(method: str, path: str, body: dict | None = None) -> dict:
@@ -92,7 +98,7 @@ def main() -> None:
     default_tools = payload.pop("defaultTools", [])
     system_prompt = payload.pop("systemPrompt")
     name = payload["name"]
-    assert len(tools) == 21, f"expected 21 tools, got {len(tools)}"
+    assert len(tools) >= 21, f"expected >= 21 tools, got {len(tools)}"
 
     payload.setdefault("transcriber", {})
     payload["transcriber"].setdefault("provider", "deepgram")
