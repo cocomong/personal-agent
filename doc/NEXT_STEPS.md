@@ -37,6 +37,13 @@
    The detailed onboarding steps are served by the hook as `onboarding_steps`
    (full when setup incomplete, EMPTY when complete) so the prompt only carries
    them when needed; a short fallback stays static.
+   **Greeting + hang-up (2026-08-29):** hook returns a time-aware randomized
+   `firstMessage` (morning variants w/ "good morning"; else "what's up?" /
+   "what's happening?" / "what's good?"; personalized with pm_preferred_name;
+   straight into onboarding when setup incomplete). Assistant: firstMessageMode
+   assistant-speaks-first + endCallFunctionEnabled + endCallPhrases +
+   endCallMessage "Take care!" so the call hangs up after goodbye. worker_count
+   dropped from hook/prompt.
 3. **Deadline Reminder workflow (n8n)** — the passive nudges from build-order item 5
    (Aug 26): lien/holdback reminders at 7/3/1 day, lead-time "order materials" nudges,
    same-day inspections. DB layer exists (`view_schedule` + lien/holdback clocks in 0014);

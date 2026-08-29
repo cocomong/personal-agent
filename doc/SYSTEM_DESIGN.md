@@ -998,6 +998,23 @@ Verified: Code-node unit test (both branches) + live hook returns 1147-char
 steps when incomplete, 0 chars when complete; assistant read-back shows the
 `{{onboarding_steps}}` placeholder.
 
+### 15.2b Greeting + call hang-up (human-like first message)
+- The hook also returns `firstMessage` per call: setup incomplete → straight
+  into onboarding ("Hey, let's get you set up - what's the company name?");
+  setup complete → a time-aware, randomized greeting personalized with
+  `pm_preferred_name` (morning: "Hey boss, good morning, what's up?" /
+  "Good morning boss, what's happening?"; otherwise "Hey boss, what's up?" /
+  "Hey boss, what's happening?" / "What's good, boss?" — picked randomly like
+  a real human; generic forms when no preferred name is set). Time is computed
+  in America/Vancouver.
+- Assistant config: `firstMessageMode: assistant-speaks-first`;
+  `endCallFunctionEnabled: true` + `endCallPhrases` + `endCallMessage:
+  "Take care!"`; system prompt rule: say a short goodbye then call `endCall`
+  so the call actually hangs up. (Fix for: LLM said goodbye but the call
+  never ended.)
+- `worker_count` was removed from the hook variables and the prompt's Setup
+  Status block (the get_onboarding_status tool still reports worker counts).
+
 ### 15.3 Data model (decision D3)
 `company_profile` gains `pm_name`, `pm_preferred_name`, `setup_completed_at`
 (NULL = pending). Workers upsert into the existing `workers` table by
