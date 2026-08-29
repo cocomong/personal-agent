@@ -970,13 +970,22 @@ that denotes setup is done" already exists (`company_profile.setup_completed_at`
 what was missing was delivering it without a tool call. Fix: a **Vapi call-start
 hook** (assistant-level `serverUrl`):
 
-1. On every call, Vapi POSTs to `https://n8n2.ordrnow.com/webhook/vapi/assistant-hook`
+1. On every call, Vapi POSTs an `assistant-request` to
+   `https://n8n2.ordrnow.com/webhook/vapi/assistant-hook`
    (n8n workflow `vapi-assistant-hook.json`, active).
-2. n8n reads `company_profile` → responds
-   `{"variables":{"setup_complete":false,"company_name":"Ireh Construction",
-   "pm_preferred_name":"","worker_count":"2","onboarding_steps":"…"}}`.
-3. Vapi interpolates those into the system prompt's "Setup Status" block
-   (`setup_complete: {{setup_complete}}` …).
+2. n8n reads `company_profile` → responds with the documented contract
+   (`docs.vapi.ai/server-url/events`): the stored assistant id plus per-call
+   overrides —
+   `{"assistantId":"67e2850c-…","assistantOverrides":{"variableValues":
+   {"setup_complete":false,"company_name":"Ireh Construction",
+   "pm_preferred_name":"","onboarding_steps":"…"},"firstMessage":"…"}}`.
+   (Earlier attempt returned `{firstMessage, variables}` at TOP level — NOT a
+   documented assistant-request response; Vapi retried it and fell back to the
+   stored config, which is why the dynamic greeting initially never played.)
+3. Vapi uses the stored assistant (model/voice/tools/prompt) and interpolates
+   `variableValues` into the prompt's "Setup Status" block
+   (`setup_complete: {{setup_complete}}` …), speaking the override
+   `firstMessage`.
 4. The system prompt instructs: if `setup_complete` is false, run First-Run
    Setup BEFORE any other work.
 
@@ -999,8 +1008,9 @@ steps when incomplete, 0 chars when complete; assistant read-back shows the
 `{{onboarding_steps}}` placeholder.
 
 ### 15.2b Greeting + call hang-up (human-like first message)
-- The hook also returns `firstMessage` per call: setup incomplete → straight
-  into onboarding ("Hey, let's get you set up - what's the company name?");
+- The hook also returns a per-call `firstMessage` (inside `assistantOverrides`)
+  that overrides the stored greeting: setup incomplete → straight into
+  onboarding ("Hey, let's get you set up - what's the company name?");
   setup complete → a time-aware, randomized greeting personalized with
   `pm_preferred_name` (morning: "Hey boss, good morning, what's up?" /
   "Good morning boss, what's happening?"; otherwise "Hey boss, what's up?" /
