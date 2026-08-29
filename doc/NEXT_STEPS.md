@@ -34,6 +34,9 @@
    `/webhook/vapi/assistant-hook` (workflow vapi-assistant-hook.json) injects
    `setup_complete`/company/PM/worker variables into the system prompt at call
    start — LLM knows setup state with zero tool calls (SYSTEM_DESIGN.md §15.2a).
+   The detailed onboarding steps are served by the hook as `onboarding_steps`
+   (full when setup incomplete, EMPTY when complete) so the prompt only carries
+   them when needed; a short fallback stays static.
 3. **Deadline Reminder workflow (n8n)** — the passive nudges from build-order item 5
    (Aug 26): lien/holdback reminders at 7/3/1 day, lead-time "order materials" nudges,
    same-day inspections. DB layer exists (`view_schedule` + lien/holdback clocks in 0014);

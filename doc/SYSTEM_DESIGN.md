@@ -974,7 +974,7 @@ hook** (assistant-level `serverUrl`):
    (n8n workflow `vapi-assistant-hook.json`, active).
 2. n8n reads `company_profile` → responds
    `{"variables":{"setup_complete":false,"company_name":"Ireh Construction",
-   "pm_preferred_name":"","worker_count":"2"}}`.
+   "pm_preferred_name":"","worker_count":"2","onboarding_steps":"…"}}`.
 3. Vapi interpolates those into the system prompt's "Setup Status" block
    (`setup_complete: {{setup_complete}}` …).
 4. The system prompt instructs: if `setup_complete` is false, run First-Run
@@ -982,8 +982,21 @@ hook** (assistant-level `serverUrl`):
 
 Result: zero tool calls to learn setup state; onboarding triggers reliably on
 the first real call. `get_onboarding_status` remains as a mid-call refresh
-(e.g. right after `complete_onboarding`). Verified: hook returns correct
-variables live; assistant read-back shows `serverUrl` + prompt block.
+(e.g. right after `complete_onboarding`).
+
+**Conditional onboarding instructions (prompt stays lean).** The detailed
+First-Run Setup steps are NOT in the static prompt — they live in the hook's
+Code node and are returned as the `onboarding_steps` variable:
+- setup incomplete → variable = full step-by-step instructions (injected into
+  the prompt, guaranteed in-context, zero lookups);
+- setup complete → variable = empty string (the prompt renders with an empty
+  line — the steps are not carried when unnecessary).
+The static prompt keeps only the small Setup Status block plus a 3-line
+fallback so onboarding can still happen even if the hook ever failed. The
+steps are editable in the n8n workflow without re-syncing the Vapi assistant.
+Verified: Code-node unit test (both branches) + live hook returns 1147-char
+steps when incomplete, 0 chars when complete; assistant read-back shows the
+`{{onboarding_steps}}` placeholder.
 
 ### 15.3 Data model (decision D3)
 `company_profile` gains `pm_name`, `pm_preferred_name`, `setup_completed_at`

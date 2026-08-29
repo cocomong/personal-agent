@@ -37,20 +37,31 @@
   },
   {
    "parameters": {
+    "jsCode": "// Build the setup-status variables for Vapi.\n// onboarding_steps is injected into the system prompt ONLY while setup is\n// incomplete, so the prompt does not carry it once onboarding is done.\nconst row = $input.first().json;\nconst setupComplete = !!row.setup_complete;\nconst steps = setupComplete ? '' : [\n  '# First-Run Setup (Onboarding) - follow these steps',\n  '- Run onboarding BEFORE any other work when setup_complete is false, even if',\n  '  the caller asks for something else first - tell them one minute of setup is needed.',\n  '- Do NOT call get_onboarding_status to learn the status; it is injected above.',\n  '  Call it only to refresh mid-call (e.g. right after complete_onboarding).',\n  '  1. Ask for the company name.',\n  \"  2. Ask for the project manager's full name.\",\n  '  3. Ask how the PM wants to be addressed every day (e.g. \"Dave\" or \"boss\").',\n  \"  4. Ask for each worker's name, trade, and hourly rate, one at a time\",\n  '     (ask \"anyone else?\" until they say no).',\n  '  5. When you have everything, call complete_onboarding with all fields',\n  '     (workers as an array), then confirm: \"All set - everything is registered.\"',\n  '- Keep each question short (10-15 words). Never call complete_onboarding before',\n  '  you have company name, PM name, preferred address, and the worker list (an',\n  '  empty workers array is allowed only if they have no crew yet).',\n  '- If setup IS complete, never re-run onboarding unless the user asks to change',\n  '  company details; use add_worker for new crew members.',\n].join('\\n');\nreturn [{\n  json: {\n    variables: {\n      setup_complete: row.setup_complete,\n      company_name: row.company_name,\n      pm_preferred_name: row.pm_preferred_name,\n      worker_count: row.worker_count,\n      onboarding_steps: steps,\n    },\n  },\n}];"
+   },
+   "id": "hook-0004",
+   "name": "Build Hook Variables",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [440, 0]
+  },
+  {
+   "parameters": {
     "respondWith": "json",
-    "responseBody": "={{ { variables: { setup_complete: $json.setup_complete, company_name: $json.company_name, pm_preferred_name: $json.pm_preferred_name, worker_count: $json.worker_count } } }}",
+    "responseBody": "={{ $json }}",
     "options": {"responseCode": 200}
    },
    "id": "hook-0003",
    "name": "Respond Hook (variables)",
    "type": "n8n-nodes-base.respondToWebhook",
    "typeVersion": 1.1,
-   "position": [440, 0]
+   "position": [660, 0]
   }
  ],
  "connections": {
   "Assistant Hook Webhook": {"main": [[{"node": "Exec: read_setup_status", "type": "main", "index": 0}]]},
-  "Exec: read_setup_status": {"main": [[{"node": "Respond Hook (variables)", "type": "main", "index": 0}]]}
+  "Exec: read_setup_status": {"main": [[{"node": "Build Hook Variables", "type": "main", "index": 0}]]},
+  "Build Hook Variables": {"main": [[{"node": "Respond Hook (variables)", "type": "main", "index": 0}]]}
  },
  "settings": {},
  "active": true
