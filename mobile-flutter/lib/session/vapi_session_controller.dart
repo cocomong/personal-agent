@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:vapi/vapi.dart';
 
 import '../config.dart';
@@ -36,11 +38,35 @@ class VapiSessionController extends ChangeNotifier {
   Future<void> start() async {
     await init();
     await stop();
-    final call = await _client!.start(assistantId: vapiAssistantId);
+    final overrides = await _fetchSessionOverrides();
+    final call = await _client!.start(
+      assistantId: vapiAssistantId,
+      assistantOverrides: overrides,
+    );
     _call = call;
     _subscription = call.onEvent.listen(_handleEvent);
     _status = SessionStatus.connecting;
     notifyListeners();
+  }
+
+  /// Fetch per-call assistant overrides (setup-status variables + dynamic
+  /// greeting) from the n8n call-start hook. Web calls don't trigger a
+  /// server-side assistant-request, so the client must pass them in.
+  /// Falls back to an empty overrides map (plain stored assistant) if the
+  /// hook is unreachable, so calls still work.
+  Future<Map<String, dynamic>> _fetchSessionOverrides() async {
+    try {
+      final resp = await http
+          .post(Uri.parse(vapiSessionHookUrl),
+              headers: {'Content-Type': 'application/json'}, body: '{}')
+          .timeout(const Duration(seconds: 5));
+      if (resp.statusCode != 200) return const {};
+      final body = jsonDecode(resp.body) as Map<String, dynamic>;
+      final overrides = body['assistantOverrides'];
+      return overrides is Map<String, dynamic> ? overrides : const {};
+    } catch (_) {
+      return const {};
+    }
   }
 
   Future<void> sendUserText(String content) async {
