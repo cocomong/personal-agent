@@ -1,16 +1,18 @@
 import 'dart:convert';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 import '../config.dart';
 import 'session_store.dart';
 
-/// Google sign-in -> Firebase Auth -> n8n /webhook/auth/google -> session.
+/// Google sign-in -> n8n /webhook/auth/google -> session.
 ///
-/// The Google ID token is verified SERVER-SIDE (keyless tokeninfo endpoint);
-/// the app only ever holds the returned HMAC session token, which becomes the
+/// The app sends the RAW Google ID token from GoogleSignIn. The backend
+/// verifies it server-side via the keyless tokeninfo endpoint. NOTE: do NOT
+/// exchange it for a FirebaseAuth token — Firebase re-issued tokens are signed
+/// with Firebase's own keys and tokeninfo rejects them (AUTH_INVALID_IDTOKEN).
+/// The app only ever holds the returned HMAC session token, which becomes the
 /// identity key for every later hook/register call (X-User-Token header).
 class AuthService {
   AuthService._();
@@ -30,23 +32,15 @@ class AuthService {
     final idToken = googleAuth.idToken;
     if (idToken == null) {
       throw StateError(
-          'AUTH_NO_IDTOKEN: Firebase Google sign-in not configured yet '
-          '(missing web client id / provider not enabled in Firebase console)');
+          'AUTH_NO_IDTOKEN: Google did not return an ID token '
+          '(check the web client id / serverClientId config)');
     }
-
-    final credential = GoogleAuthProvider.credential(
-      idToken: idToken,
-      accessToken: googleAuth.accessToken,
-    );
-    final userCredential =
-        await FirebaseAuth.instance.signInWithCredential(credential);
-    final firebaseToken = await userCredential.user!.getIdToken();
 
     final resp = await http
         .post(
           Uri.parse('$n8nBaseUrl/webhook/auth/google'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'idToken': firebaseToken}),
+          body: jsonEncode({'idToken': idToken}),
         )
         .timeout(const Duration(seconds: 15));
 
@@ -67,7 +61,6 @@ class AuthService {
 
   Future<void> signOut() async {
     await _googleSignIn.signOut();
-    await FirebaseAuth.instance.signOut();
     await SessionStore.instance.clear();
   }
 }

@@ -174,8 +174,11 @@ Constraint changes required:
 
 Request:
 ```json
-{ "idToken": "<google id token from firebase_auth>" }
+{ "idToken": "<google id token from google_sign_in>" }
 ```
+NOTE: the token MUST be the raw Google-issued ID token. Do NOT send a
+FirebaseAuth-reissued token — Firebase tokens are signed with Firebase's own
+keys and the tokeninfo endpoint rejects them ("Invalid Value").
 Response 200:
 ```json
 {
