@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:vapi/vapi.dart';
 
+import '../auth/session_store.dart';
 import '../config.dart';
 
 /// Call session state surfaced to the UI.
@@ -56,9 +57,14 @@ class VapiSessionController extends ChangeNotifier {
   /// hook is unreachable, so calls still work.
   Future<Map<String, dynamic>> _fetchSessionOverrides() async {
     try {
+      final headers = {'Content-Type': 'application/json'};
+      final sessionToken = SessionStore.instance.token;
+      if (sessionToken != null && sessionToken.isNotEmpty) {
+        headers['X-User-Token'] = sessionToken;
+      }
       final resp = await http
           .post(Uri.parse(vapiSessionHookUrl),
-              headers: {'Content-Type': 'application/json'}, body: '{}')
+              headers: headers, body: '{}')
           .timeout(const Duration(seconds: 5));
       if (resp.statusCode != 200) return const {};
       final body = jsonDecode(resp.body) as Map<String, dynamic>;

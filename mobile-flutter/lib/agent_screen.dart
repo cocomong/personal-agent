@@ -7,7 +7,10 @@ import '../session/vapi_session_controller.dart';
 /// session (VapiSessionController), so the agent keeps context across
 /// speak-or-type turns.
 class AgentScreen extends StatefulWidget {
-  const AgentScreen({super.key});
+  const AgentScreen({super.key, this.onSignOut});
+
+  /// Optional: called when the user taps the sign-out button (auth gate).
+  final VoidCallback? onSignOut;
 
   @override
   State<AgentScreen> createState() => _AgentScreenState();
@@ -84,7 +87,21 @@ class _AgentScreenState extends State<AgentScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              _ModeSwitch(voiceMode: _voiceMode, onChanged: _onModeChanged),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ModeSwitch(
+                        voiceMode: _voiceMode, onChanged: _onModeChanged),
+                  ),
+                  if (widget.onSignOut != null)
+                    IconButton(
+                      tooltip: 'Sign out',
+                      onPressed: widget.onSignOut,
+                      icon: const Icon(Icons.logout,
+                          color: Color(0xFF94A3B8), size: 20),
+                    ),
+                ],
+              ),
               const SizedBox(height: 12),
               Expanded(child: _TranscriptList(entries: _transcript)),
               const SizedBox(height: 12),

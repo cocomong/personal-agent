@@ -21,9 +21,24 @@
   },
   {
    "parameters": {
+    "jsCode": "// Resolve the caller's company from the X-User-Token (HMAC session token,\n// format v1.<payload>.<sig>, issued by /webhook/auth/google).\n// No/invalid token -> uid null -> the query falls back to the legacy\n// single-tenant company (id=1), preserving current behavior until the app\n// is login-gated. Multi-tenant Step 1: doc/MULTITENANT.md section 4.2.\nconst crypto = require('crypto');\nconst req = $input.first().json || {};\nconst headers = req.headers || {};\nconst token = String(headers['x-user-token'] || headers['X-User-Token'] || '').trim();\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nlet uid = null;\nif (token && secret) {\n  try {\n    const parts = token.split('.');\n    if (parts.length === 3 && parts[0] === 'v1') {\n      const payloadB64 = parts[1];\n      const sigB64 = parts[2];\n      const expected = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url');\n      const a = Buffer.from(sigB64);\n      const b = Buffer.from(expected);\n      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {\n        const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());\n        if (payload.uid && payload.exp * 1000 > Date.now()) uid = payload.uid;\n      }\n    }\n  } catch (e) {\n    uid = null;  // invalid token -> fallback to single-tenant\n  }\n}\nreturn [{ json: { uid } }];"
+   },
+   "id": "hook-0005",
+   "name": "Resolve Company Scope",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    220,
+    0
+   ]
+  },
+  {
+   "parameters": {
     "operation": "executeQuery",
-    "query": "SELECT (setup_completed_at IS NOT NULL) AS setup_complete,\n       company_name,\n       COALESCE(pm_preferred_name, '') AS pm_preferred_name\n  FROM company_profile WHERE id = 1;",
-    "options": {}
+    "query": "SELECT (cp.setup_completed_at IS NOT NULL) AS setup_complete,\n       cp.company_name,\n       COALESCE(cp.pm_preferred_name, '') AS pm_preferred_name\n  FROM company_profile cp\n WHERE cp.id = COALESCE((SELECT company_id FROM users WHERE id = $1::uuid), 1)\n LIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.uid] }}"
+    }
    },
    "id": "hook-0002",
    "name": "Exec: read_setup_status",
@@ -31,7 +46,7 @@
    "typeVersion": 2.5,
    "alwaysOutputData": true,
    "position": [
-    220,
+    440,
     0
    ],
    "credentials": {
@@ -50,7 +65,7 @@
    "type": "n8n-nodes-base.code",
    "typeVersion": 2,
    "position": [
-    440,
+    660,
     0
    ]
   },
@@ -67,13 +82,24 @@
    "type": "n8n-nodes-base.respondToWebhook",
    "typeVersion": 1.1,
    "position": [
-    660,
+    880,
     0
    ]
   }
  ],
  "connections": {
   "Assistant Hook Webhook": {
+   "main": [
+    [
+     {
+      "node": "Resolve Company Scope",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Resolve Company Scope": {
    "main": [
     [
      {

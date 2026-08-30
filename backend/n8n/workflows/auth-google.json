@@ -1,0 +1,205 @@
+{
+ "name": "Auth Google (sign-in)",
+ "id": "auth-google-001",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "auth/google",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "id": "auth-0001",
+   "name": "Auth Google Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    0,
+    0
+   ],
+   "webhookId": "auth-google"
+  },
+  {
+   "parameters": {
+    "jsCode": "// Verify the Google ID token server-side (keyless tokeninfo endpoint).\n// Contract: doc/MULTITENANT.md section 4.1.\n// n8n 2.x delivers the parsed request body under $json.body; the Code-node\n// sandbox has no global fetch, so use https (allowed via NODE_FUNCTION_ALLOW_BUILTIN).\nconst https = require('https');\n\nfunction getJson(url) {\n  return new Promise((resolve, reject) => {\n    https.get(url, (res) => {\n      let data = '';\n      res.on('data', (c) => { data += c; });\n      res.on('end', () => {\n        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }\n        catch (e) { reject(new Error('tokeninfo returned non-JSON')); }\n      });\n    }).on('error', reject);\n  });\n}\n\nconst payload = ($input.first().json || {}).body || {};\nconst idToken = payload.idToken ? String(payload.idToken).trim() : '';\nif (!idToken) {\n  return [{ json: { ok: false, statusCode: 400, error: 'AUTH_MISSING_IDTOKEN: body.idToken is required' } }];\n}\nconst { status, body: info } = await getJson(\n  `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`\n);\nif (status !== 200 || info.error) {\n  return [{ json: {\n    ok: false,\n    statusCode: 401,\n    error: 'AUTH_INVALID_IDTOKEN: ' + (info.error_description || info.error || status),\n  } }];\n}\n// tokeninfo returns email_verified as the string \"true\".\nconst verified = info.email_verified === true || info.email_verified === 'true';\nif (!verified) {\n  return [{ json: { ok: false, statusCode: 401, error: 'AUTH_EMAIL_NOT_VERIFIED' } }];\n}\nreturn [{ json: {\n  ok: true,\n  google_sub: String(info.sub),\n  email: String(info.email || '').toLowerCase(),\n  name: String(info.name || '').trim(),\n} }];"
+   },
+   "id": "auth-0002",
+   "name": "Verify Google idToken",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    220,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "valid-idtoken",
+       "leftValue": "={{ String($json.ok) }}",
+       "rightValue": "true",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "auth-0006",
+   "name": "Valid idToken?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    440,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH u AS (\n  INSERT INTO users (google_sub, email, name, last_login_at)\n  VALUES ($1, $2, $3, CURRENT_TIMESTAMP)\n  ON CONFLICT (google_sub) DO UPDATE SET\n    email = EXCLUDED.email,\n    name  = EXCLUDED.name,\n    last_login_at = CURRENT_TIMESTAMP\n  RETURNING id, email, name, company_id\n)\nSELECT u.id, u.email, u.name, u.company_id,\n       (cp.setup_completed_at IS NOT NULL) AS setup_complete\nFROM u LEFT JOIN company_profile cp ON cp.id = u.company_id;",
+    "options": {
+     "queryReplacement": "={{ [$json.google_sub, $json.email, $json.name] }}"
+    }
+   },
+   "id": "auth-0003",
+   "name": "Upsert User",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    660,
+    0
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "jsCode": "// Issue the HMAC session token (v1.<payload>.<sig>).\n// Payload: { uid, exp } \u2014 30 day expiry. Secret: AUTH_TOKEN_SECRET (n8n env).\nconst crypto = require('crypto');\nconst row = $input.first().json;\nconst secret = $env.AUTH_TOKEN_SECRET;\nif (!secret) {\n  return [{ json: { ok: false, statusCode: 500, error: 'AUTH_SECRET_NOT_CONFIGURED' } }];\n}\nconst exp = Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 30);\nconst payload = Buffer.from(JSON.stringify({ uid: row.id, exp })).toString('base64url');\nconst sig = crypto.createHmac('sha256', secret).update(payload).digest('base64url');\nreturn [{ json: {\n  token: `v1.${payload}.${sig}`,\n  user: {\n    id: row.id,\n    name: row.name,\n    email: row.email,\n    company_id: row.company_id,\n    setup_complete: !!row.setup_complete,\n  },\n} }];"
+   },
+   "id": "auth-0004",
+   "name": "Issue Session Token",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    880,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ $json }}",
+    "options": {
+     "responseCode": 200
+    }
+   },
+   "id": "auth-0005",
+   "name": "Respond Auth",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.1,
+   "position": [
+    1100,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ $json }}",
+    "options": {
+     "responseCode": 400
+    }
+   },
+   "id": "auth-0007",
+   "name": "Respond Auth Error",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.1,
+   "position": [
+    1100,
+    200
+   ]
+  }
+ ],
+ "connections": {
+  "Auth Google Webhook": {
+   "main": [
+    [
+     {
+      "node": "Verify Google idToken",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Verify Google idToken": {
+   "main": [
+    [
+     {
+      "node": "Valid idToken?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Valid idToken?": {
+   "main": [
+    [
+     {
+      "node": "Upsert User",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Respond Auth Error",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Upsert User": {
+   "main": [
+    [
+     {
+      "node": "Issue Session Token",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Issue Session Token": {
+   "main": [
+    [
+     {
+      "node": "Respond Auth",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {},
+ "active": true
+}

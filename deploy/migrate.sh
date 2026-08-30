@@ -40,6 +40,7 @@ MIGRATIONS=(
   0014_schedule.sql
   0015_device_tokens.sql
   0016_onboarding.sql
+  0017_accounts.sql
 )
 
 VERIFY=(
