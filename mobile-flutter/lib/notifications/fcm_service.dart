@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../auth/session_store.dart';
 import '../config.dart';
 import 'notification_service.dart';
 
@@ -19,6 +20,8 @@ class FcmService {
   bool _configured = false;
   bool get isConfigured => _configured;
 
+  String? _fcmToken;
+
   Future<void> init() async {
     try {
       await Firebase.initializeApp();
@@ -26,6 +29,7 @@ class FcmService {
       await messaging.requestPermission();
       final token = await messaging.getToken();
       _configured = token != null && token.isNotEmpty;
+      _fcmToken = token;
 
       if (_configured) {
         FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
@@ -45,12 +49,32 @@ class FcmService {
     }
   }
 
+  /// Re-registers the device AFTER sign-in, so the backend can associate the
+  /// FCM token with the authenticated user (device_tokens -> company).
+  Future<void> registerAfterLogin() async {
+    final token = _fcmToken;
+    if (token == null || token.isEmpty) return;
+    try {
+      final briefingTime = await _registerDevice(token);
+      if (briefingTime != null && briefingTime.isNotEmpty) {
+        await NotificationService.instance.scheduleDaily(briefingTime);
+      }
+    } catch (e) {
+      debugPrint('register_after_login failed: $e');
+    }
+  }
+
   Future<String?> _registerDevice(String token) async {
     try {
+      final headers = {'Content-Type': 'application/json'};
+      final sessionToken = SessionStore.instance.token;
+      if (sessionToken != null && sessionToken.isNotEmpty) {
+        headers['X-User-Token'] = sessionToken;
+      }
       final resp = await http
           .post(
             Uri.parse('$n8nBaseUrl/webhook/device/register'),
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: jsonEncode({
               'token': token,
               'platform':
