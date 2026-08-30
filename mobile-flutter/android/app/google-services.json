@@ -12,7 +12,20 @@
           "package_name": "com.ordrnow.personal_agent_mobile"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "833673773098-atkprl6pinddoedr4ehlv1o1v0vdlpgs.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ordrnow.personal_agent_mobile",
+            "certificate_hash": "ad75a0f006a22bd816962a33e52e3adf536a63e2"
+          }
+        },
+        {
+          "client_id": "833673773098-r0sjjedbqovek0bbe88p91ce12aq24dq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDOM7ZpxM0v1CeKEqMqzaR7z2_j4LZ6114"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "833673773098-r0sjjedbqovek0bbe88p91ce12aq24dq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
