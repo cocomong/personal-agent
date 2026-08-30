@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "833673773098",
+    "project_id": "personal-agent-b7ab4",
+    "storage_bucket": "personal-agent-b7ab4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:833673773098:android:fbca51b5bea068e1798353",
+        "android_client_info": {
+          "package_name": "com.ordrnow.personal_agent_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOM7ZpxM0v1CeKEqMqzaR7z2_j4LZ6114"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
