@@ -91,8 +91,10 @@ A second workflow (`n8n/workflows/approval-portal.json`) hosts the **customer-fa
 | `/webhook/estimate/approval` | POST | Record approval; set `original_contract_value` = Σ(estimates) |
 | `/webhook/approve-change-order?token=` | GET | Render one change order + Approve/Reject form |
 | `/webhook/change-order/approval` | POST | Record approval; recompute `revised_contract_value` |
+| `/webhook/approve-invoice?invoice=&sig=` | GET | PM-facing: after approving the preview, emails the real invoice to the client and stamps `invoices.email_sent_at` (double-send guarded) |
+| `/webhook/reject-invoice?invoice=&sig=` | GET | PM-facing: cancels the send — invoice is NOT emailed to the client |
 
-- Token-gated: `approval_token` on `change_orders`, `baseline_approval_token` on `projects` (`db/0005`, `0006`).
+- Token-gated: `approval_token` on `change_orders`, `baseline_approval_token` on `projects` (`db/0005`, `0006`). Invoice approve/reject links are HMAC-signed with `AUTH_TOKEN_SECRET` (`db/0018`, workflow `n8n/workflows/approve-invoice.json`).
 - `create_change_order` (voice gateway) is gated on `baseline_status = 'APPROVED'`.
 - The CO-approval recompute must add the just-approved `decided` delta explicitly — data-modifying CTEs share one snapshot, so a `recalc` CTE can't see the `decided` flip (see `SYSTEM_DESIGN.md` §5).
 - Signer name is captured as typed-name e-signature (`signer_name` / `baseline_signer_name`).

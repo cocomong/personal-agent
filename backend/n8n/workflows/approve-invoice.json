@@ -1,0 +1,566 @@
+{
+ "name": "Invoice Approval (preview send)",
+ "id": "invoice-approval-001",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "GET",
+    "path": "approve-invoice",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "id": "inv-wh-approve",
+   "name": "approve-invoice",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.1,
+   "position": [
+    240,
+    0
+   ],
+   "webhookId": "inv-wh-approve"
+  },
+  {
+   "parameters": {
+    "jsCode": "const crypto = require('crypto');\nconst data = ($input.first().json || {}).query || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst invoice = String(data.invoice || '').trim();\nconst sig = String(data.sig || '').trim();\nconst expected = crypto.createHmac('sha256', secret).update(invoice).digest('base64url');\nconst ok = invoice.length > 0 && sig === expected;\nreturn [{ json: { ok, invoice, decision: ok ? 'APPROVE' : '' } }];"
+   },
+   "id": "inv-02",
+   "name": "Verify Signature (Approve)",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    480,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "sig-ok-(approve)?",
+       "leftValue": "={{ String($json.ok) }}",
+       "rightValue": "true",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "inv-03",
+   "name": "Sig OK (Approve)?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    700,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT i.id, i.invoice_number, i.invoice_type, i.net_amount, i.gst_amount, i.pst_amount, i.amount_due, i.holdback_amount, i.issued_date, i.due_date, i.email_sent_at, p.title AS project_name, c.name AS customer_name, c.email, cp.email_from, cp.email_from_name, cp.street_address, cp.city, cp.province, cp.postal_code, cp.phone, cp.signature_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM invoices i JOIN projects p ON p.id = i.project_id JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (i.id::text = $1 OR i.invoice_number = $1) LIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.invoice] }}"
+    }
+   },
+   "id": "inv-04",
+   "name": "Lookup Invoice",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    920,
+    0
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   },
+   "alwaysOutputData": true
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "already-sent?",
+       "leftValue": "={{ $json.email_sent_at }}",
+       "rightValue": "",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "inv-05",
+   "name": "Already Sent?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    1140,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "const inv = $input.first()?.json;\nconst money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\nconst company = inv?.company_name ?? 'Ireh Construction';\nconst accent = inv?.brand_accent_color ?? '#2563eb';\nconst primary = inv?.brand_primary_color ?? '#1a3a5c';\nconst addressLine = [inv?.street_address, inv?.city, `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`].filter(Boolean).join(', ');\nconst html = `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 2rem; }\n  .header { display: flex; justify-content: space-between; border-bottom: 2px solid ${primary}; padding-bottom: 1rem; }\n  .title { font-size: 1.5rem; font-weight: 700; color: ${primary}; }\n  .co { color: #64748b; font-size: .85rem; }\n  .row { display: flex; justify-content: space-between; padding: .4rem 0; }\n  .total { font-size: 1.3rem; font-weight: 700; border-top: 2px solid ${primary}; margin-top: 1rem; padding-top: 1rem; }\n  @media print { body { margin: 0; } }\n</style></head><body>\n  <div class=\"header\">\n    <div><div class=\"title\">${company}</div><div class=\"co\">${addressLine}</div><div class=\"co\">${inv?.phone ?? ''}</div></div>\n    <div style=\"text-align:right\"><div class=\"title\">Invoice</div><div>${inv?.invoice_number ?? ''}</div><div>Issued: ${inv?.issued_date ?? ''}</div><div>Due: ${inv?.due_date ?? ''}</div></div>\n  </div>\n  <p><strong>Project:</strong> ${inv?.project_name ?? ''}</p>\n  <p><strong>Customer:</strong> ${inv?.customer_name ?? ''}</p>\n  <p><strong>Type:</strong> ${inv?.invoice_type ?? ''}</p>\n  <div class=\"row\"><span>Subtotal (net)</span><span>${money(inv?.net_amount)}</span></div>\n  ${Number(inv?.gst_amount) ? `<div class=\"row\"><span>GST</span><span>${money(inv?.gst_amount)}</span></div>` : ''}\n  ${Number(inv?.pst_amount) ? `<div class=\"row\"><span>PST</span><span>${money(inv?.pst_amount)}</span></div>` : ''}\n  <div class=\"row\"><span>Holdback</span><span>${money(inv?.holdback_amount)}</span></div>\n  <div class=\"total\">Total due ${money(inv?.amount_due)}</div>\n</body></html>`;\nreturn [{ json: { ...inv, html } }];"
+   },
+   "id": "inv-06",
+   "name": "Render Client Invoice",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1360,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "resource": "message",
+    "operation": "send",
+    "sendTo": "={{ $json.email }}",
+    "subject": "={{ 'Invoice ' + $json.invoice_number + ' for ' + $json.project_name }}",
+    "emailType": "html",
+    "message": "={{ $json.html }}"
+   },
+   "id": "inv-07",
+   "name": "Send Invoice to Client",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2,
+   "position": [
+    1560,
+    0
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "id": "YOUR_GMAIL_OAUTH_CREDENTIALS_ID",
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "UPDATE invoices SET email_sent_at = CURRENT_TIMESTAMP WHERE (id::text = $1 OR invoice_number = $1) AND email_sent_at IS NULL RETURNING invoice_number;",
+    "options": {
+     "queryReplacement": "={{ [$('Lookup Invoice').first().json.invoice_number] }}"
+    }
+   },
+   "id": "inv-08",
+   "name": "Mark Invoice Sent",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    1760,
+    0
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "jsCode": "const marked = $input.first()?.json;\nconst row = $('Lookup Invoice').first().json;\nconst sent = !!(marked && marked.invoice_number);\nconst when = row?.email_sent_at ? ' on ' + String(row.email_sent_at).slice(0, 10) : '';\nconst html = sent\n  ? `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#16a34a\">Invoice sent</h1><p>Invoice <strong>${row?.invoice_number ?? ''}</strong> was emailed to <strong>${row?.email ?? ''}</strong>.</p><p>You can close this page.</p></body></html>`\n  : `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#d97706\">Already sent</h1><p>Invoice <strong>${row?.invoice_number ?? ''}</strong> was already emailed to <strong>${row?.email ?? ''}</strong>${when}.</p></body></html>`;\nreturn [{ json: { html } }];"
+   },
+   "id": "inv-09",
+   "name": "Build Sent Page",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1960,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "text",
+    "responseBody": "={{ $json.html }}",
+    "options": {
+     "responseCode": 200,
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Content-Type",
+        "value": "text/html; charset=utf-8"
+       }
+      ]
+     }
+    }
+   },
+   "id": "inv-10",
+   "name": "Respond Page (Sent)",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1,
+   "position": [
+    2160,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "const row = $input.first()?.json;\nconst when = row?.email_sent_at ? ' on ' + String(row.email_sent_at).slice(0, 10) : '';\nconst html = `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#d97706\">Already sent</h1><p>Invoice <strong>${row?.invoice_number ?? ''}</strong> was already emailed to <strong>${row?.email ?? ''}</strong>${when}.</p><p>You can close this page.</p></body></html>`;\nreturn [{ json: { html } }];"
+   },
+   "id": "inv-19",
+   "name": "Build Already-Sent Page",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1360,
+    200
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "text",
+    "responseBody": "={{ $json.html }}",
+    "options": {
+     "responseCode": 200,
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Content-Type",
+        "value": "text/html; charset=utf-8"
+       }
+      ]
+     }
+    }
+   },
+   "id": "inv-11",
+   "name": "Respond Page (Already Sent)",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1,
+   "position": [
+    1560,
+    200
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "text",
+    "responseBody": "={{ '<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1>Invalid or expired link</h1><p>This invoice link is invalid or expired. No email was sent.</p></body></html>' }}",
+    "options": {
+     "responseCode": 200,
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Content-Type",
+        "value": "text/html; charset=utf-8"
+       }
+      ]
+     }
+    }
+   },
+   "id": "inv-12",
+   "name": "Respond Page (Invalid)",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1,
+   "position": [
+    920,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "httpMethod": "GET",
+    "path": "reject-invoice",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "id": "inv-wh-reject",
+   "name": "reject-invoice",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.1,
+   "position": [
+    240,
+    500
+   ],
+   "webhookId": "inv-wh-reject"
+  },
+  {
+   "parameters": {
+    "jsCode": "const crypto = require('crypto');\nconst data = ($input.first().json || {}).query || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst invoice = String(data.invoice || '').trim();\nconst sig = String(data.sig || '').trim();\nconst expected = crypto.createHmac('sha256', secret).update(invoice).digest('base64url');\nconst ok = invoice.length > 0 && sig === expected;\nreturn [{ json: { ok, invoice, decision: ok ? 'REJECT' : '' } }];"
+   },
+   "id": "inv-14",
+   "name": "Verify Signature (Reject)",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    480,
+    500
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "sig-ok-(reject)?",
+       "leftValue": "={{ String($json.ok) }}",
+       "rightValue": "true",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "inv-15",
+   "name": "Sig OK (Reject)?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    700,
+    500
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "const v = $input.first()?.json;\nconst invoice = String(v?.invoice ?? '');\nconst html = `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#dc2626\">Invoice not sent</h1><p>Invoice <strong>${invoice}</strong> was <strong>not</strong> emailed to the client \u2014 you rejected the preview.</p><p>You can close this page.</p></body></html>`;\nreturn [{ json: { html } }];"
+   },
+   "id": "inv-16",
+   "name": "Render Rejected Page",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    920,
+    500
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "text",
+    "responseBody": "={{ $json.html }}",
+    "options": {
+     "responseCode": 200,
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Content-Type",
+        "value": "text/html; charset=utf-8"
+       }
+      ]
+     }
+    }
+   },
+   "id": "inv-17",
+   "name": "Respond Page (Rejected)",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1,
+   "position": [
+    1140,
+    500
+   ]
+  }
+ ],
+ "connections": {
+  "approve-invoice": {
+   "main": [
+    [
+     {
+      "node": "Verify Signature (Approve)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Verify Signature (Approve)": {
+   "main": [
+    [
+     {
+      "node": "Sig OK (Approve)?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sig OK (Approve)?": {
+   "main": [
+    [
+     {
+      "node": "Lookup Invoice",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Respond Page (Invalid)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Lookup Invoice": {
+   "main": [
+    [
+     {
+      "node": "Already Sent?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Already Sent?": {
+   "main": [
+    [
+     {
+      "node": "Build Already-Sent Page",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Render Client Invoice",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Render Client Invoice": {
+   "main": [
+    [
+     {
+      "node": "Send Invoice to Client",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Send Invoice to Client": {
+   "main": [
+    [
+     {
+      "node": "Mark Invoice Sent",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Mark Invoice Sent": {
+   "main": [
+    [
+     {
+      "node": "Build Sent Page",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build Sent Page": {
+   "main": [
+    [
+     {
+      "node": "Respond Page (Sent)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build Already-Sent Page": {
+   "main": [
+    [
+     {
+      "node": "Respond Page (Already Sent)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "reject-invoice": {
+   "main": [
+    [
+     {
+      "node": "Verify Signature (Reject)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Verify Signature (Reject)": {
+   "main": [
+    [
+     {
+      "node": "Sig OK (Reject)?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sig OK (Reject)?": {
+   "main": [
+    [
+     {
+      "node": "Render Rejected Page",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Respond Page (Invalid)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Render Rejected Page": {
+   "main": [
+    [
+     {
+      "node": "Respond Page (Rejected)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {}
+}

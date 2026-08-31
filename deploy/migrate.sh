@@ -41,6 +41,7 @@ MIGRATIONS=(
   0015_device_tokens.sql
   0016_onboarding.sql
   0017_accounts.sql
+  0018_invoice_send.sql
 )
 
 VERIFY=(

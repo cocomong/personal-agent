@@ -98,7 +98,7 @@ def main() -> None:
     default_tools = payload.pop("defaultTools", [])
     system_prompt = payload.pop("systemPrompt")
     name = payload["name"]
-    assert len(tools) >= 21, f"expected >= 21 tools, got {len(tools)}"
+    assert len(tools) >= 24, f"expected >= 24 tools, got {len(tools)}"
 
     payload.setdefault("transcriber", {})
     payload["transcriber"].setdefault("provider", "deepgram")

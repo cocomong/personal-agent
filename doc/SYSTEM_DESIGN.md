@@ -18,7 +18,7 @@ An AI-driven **voice + text assistant** for a construction manager running 3–4
 - **Voice engine:** ElevenLabs voices configured as Vapi's `voice.provider = '11labs'`.
 - **Workflow automation:** n8n as the central router and business-logic engine (receives Vapi tool-calls).
 - **Data layer:** Supabase / PostgreSQL (relational, 7 tables + a rollup view).
-- **Email delivery:** Gmail (SMTP + App Password) for customer invoices and approval links.
+- **Email delivery:** Gmail (SMTP + App Password) for customer invoices and approval links. Invoice emails are preview-approval gated: `send_customer_invoice` emails a PREVIEW to the PM first, and the client copy goes out only after the PM taps Approve (`doc/INVOICE_REVIEW_NOTES.md`).
 
 ### System flow
 
