@@ -255,8 +255,21 @@ login-gated.
       round-trip); AUTH_TOKEN_SECRET (compose env); hook token resolution w/ single-tenant fallback (LIVE, verified
       with minted token); Flutter login screen + secure token storage + X-User-Token on hook/register (analyze
       clean); Firebase console TODO (user): enable Google provider, add SHA-1, refresh google-services.json.
-- [ ] Step 2 — TENANT COLUMNS: 3.2 + 3.3 migration (nullable -> backfill -> NOT NULL),
-      constraint changes, verify with 0017-style verification script.
+- [x] Step 2 — TENANT COLUMNS (DONE + verified live 2026-09-04): db/0019 adds
+      `company_id SMALLINT NOT NULL DEFAULT 1 REFERENCES company_profile(id)` to customers, projects,
+      workers, payroll_runs, schedule_items, device_tokens, invoices. Implemented as NOT NULL DEFAULT 1
+      (not nullable->backfill) — same invariants, zero gateway breakage: every pre-Step-3 write omits
+      company_id and lands in company 1 (Ireh). company_profile.id is now sequence-driven
+      (`company_profile_id_seq` START 2) and the id=1 CHECK is dropped; created_by_user added (nullable).
+      Global uniques replaced by per-company unique INDEXES (uq_customers_company_email,
+      uq_workers_company_worker_code, uq_invoices_company_invoice_number, uq_payroll_runs_company_period)
+      — invoices needed its own company_id column (a unique cannot span a join). db/0020_tenant_verify.sql
+      (self-rolling-back) proves in-company duplicates are rejected AND cross-company duplicates allowed.
+      Bonus: voice-gateway `add_worker` was dead-on-arrival — `LPAD(int,3,'0')` is a plan-time type error
+      (never exercised live) and it relied on the now-dropped global worker_code unique. Rewritten to
+      `ON CONFLICT (company_id, worker_code)` with a `::text` LPAD arg; workflow redeployed (active).
+      NOTE: 0013(a) "company_profile has exactly 1 row" assertion must be relaxed when Step 3 starts
+      creating companies (0013/0020 live runs are clean today).
 - [ ] Step 3 — SCOPED SERVICE: hook returns caller's company; gateway tools filter by
       company_id; complete_onboarding CREATES company_profile + links user; views/functions
       per 3.4; remove single-tenant fallback.

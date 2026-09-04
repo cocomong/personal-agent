@@ -42,11 +42,13 @@ MIGRATIONS=(
   0016_onboarding.sql
   0017_accounts.sql
   0018_invoice_send.sql
+  0019_tenant_columns.sql
 )
 
 VERIFY=(
   0002_idempotency_test.sql
   0013_verification.sql
+  0020_tenant_verify.sql
 )
 
 echo "== Migrations =="

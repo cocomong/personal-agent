@@ -1,3 +1,29 @@
+# NEXT STEPS — status 2026-09-04 (Step 2 tenant columns done)
+
+## DONE since the header below was written
+- Multi-tenant Step 1 (accounts): users table (db/0017), /webhook/auth/google, HMAC session tokens,
+  Flutter Google login — live 2026-08-30 (details in doc/MULTITENANT.md).
+- Invoice preview-approval + email-on-file (db/0018, approve-invoice workflow) — live 2026-08-31
+  (details in doc/INVOICE_REVIEW_NOTES.md).
+- **Step 2 TENANT COLUMNS — DONE + verified live 2026-09-04**: db/0019 (`company_id` NOT NULL DEFAULT 1
+  on customers/projects/workers/payroll_runs/schedule_items/device_tokens/invoices; company_profile.id
+  sequence-driven; per-company unique indexes) + db/0020 self-rolling-back verification. add_worker tool
+  fixed + workflow redeployed (see MULTITENANT.md §6 Step 2 note). Pre-apply backup:
+  /home/ubuntu/backups/pm/pre-step2-tenant-20260904-163456.sql (VPS).
+
+## UP NEXT
+- Step 3 — SCOPED SERVICE (MULTITENANT.md §6): hook returns caller's company; gateway tools filter +
+  write with explicit company_id; complete_onboarding CREATES company_profile + links users.company_id;
+  drop the DEFAULT 1 once every write path is explicit; relax 0013(a) single-company assert; views/
+  functions per §3.4 (view_schedule/view_project_financial_summary company passthrough, fn_run_payroll
+  takes company). Biggest chunk of the remaining work.
+- Step 4 — STORE POLISH: real release keystore, runtime-config base URLs, app icon, privacy policy,
+  Play Console listing.
+- Backlog: Capabilities KB on Vapi; Deadline Reminder workflow (lien/holdback nudges, email-first);
+  real phone-call test.
+
+---
+
 # NEXT STEPS — updated 2026-08-27 (scheduling loop built)
 
 ## Scheduling & reminders — voice-configured briefing time (BUILT + LIVE)

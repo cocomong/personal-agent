@@ -1069,7 +1069,7 @@
   {
    "parameters": {
     "operation": "executeQuery",
-    "query": "INSERT INTO workers (worker_code, name, trade, hourly_rate, overtime_rate) SELECT COALESCE($1, (SELECT 'W-' || LPAD(COALESCE(MAX(SUBSTRING(worker_code FROM '([0-9]+)')::int), 0) + 1, 3, '0') FROM workers WHERE worker_code ~ '^W-[0-9]+$')), $2, $3, $4, $5 ON CONFLICT (worker_code) DO UPDATE SET name = EXCLUDED.name, trade = EXCLUDED.trade, hourly_rate = EXCLUDED.hourly_rate, overtime_rate = EXCLUDED.overtime_rate RETURNING id, worker_code, name, trade, hourly_rate, overtime_rate;",
+    "query": "INSERT INTO workers (worker_code, name, trade, hourly_rate, overtime_rate) SELECT COALESCE($1, (SELECT 'W-' || LPAD((COALESCE(MAX(SUBSTRING(worker_code FROM '([0-9]+)')::int), 0) + 1)::text, 3, '0') FROM workers WHERE worker_code ~ '^W-[0-9]+$')), $2, $3, $4, $5 ON CONFLICT (company_id, worker_code) DO UPDATE SET name = EXCLUDED.name, trade = EXCLUDED.trade, hourly_rate = EXCLUDED.hourly_rate, overtime_rate = EXCLUDED.overtime_rate RETURNING id, worker_code, name, trade, hourly_rate, overtime_rate;",
     "options": {
      "queryReplacement": "={{ [($json.toolArgs.worker_code ?? null), $json.toolArgs.name, ($json.toolArgs.trade ?? null), $json.toolArgs.hourly_rate, ($json.toolArgs.overtime_rate ?? null)] }}"
     }
