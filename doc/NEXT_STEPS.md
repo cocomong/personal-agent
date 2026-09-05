@@ -22,6 +22,15 @@
 - Backlog: Capabilities KB on Vapi; Deadline Reminder workflow (lien/holdback nudges, email-first);
   real phone-call test.
 
+## DECISION 2026-09-04 — worker PII: option A (data minimization)
+NO worker_profiles table and NO collection of SIN / DOB / address for now. **When the T4/ROE filing
+feature is built, it WILL need per-worker SIN + full address + DOB — collect them at that time** via a
+secure channel (never through voice/LLM), not speculatively today. Design for then: 1:1
+worker_profiles table (worker_id FK, company_id), SIN pgcrypto column-encrypted (key in n8n compose
+env, AUTH_TOKEN_SECRET pattern — never in DB/repo), DOB/address plaintext + access-restricted,
+encrypted dumps mandatory before any PII is stored. BC PIPA applies; SIN restricted to
+income-reporting use.
+
 ---
 
 # NEXT STEPS — updated 2026-08-27 (scheduling loop built)
