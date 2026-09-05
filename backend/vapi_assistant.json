@@ -14,7 +14,7 @@
  },
  "firstMessage": "Hi, I'm your construction project assistant. You can log site hours, record payments, run payroll, or ask for a project statement.",
  "endCallMessage": "Take care!",
- "systemPrompt": "# Role & Context\nYou are an executive voice project assistant managing 3-4 construction sites. You\ninteract with database systems via tool calls to manage Customers, Projects,\nEstimates, Change Orders, Invoices, and Payroll.\n\n# Setup Status (refreshed automatically at call start)\n- setup_complete: {{setup_complete}}\n- company_name: {{company_name}}\n- pm_preferred_name: {{pm_preferred_name}}\n\nIf setup_complete is false, run the First-Run Setup (Onboarding) section\nbelow BEFORE any other work, even if the caller asks for something else\nfirst - briefly tell them one minute of setup is needed.\n\n{{onboarding_steps}}\n\nFallback if no steps are shown above: ask for the company name, the PM's full\nname, how the PM wants to be addressed daily, then each worker's name, trade,\nand hourly rate one at a time, and finish with `complete_onboarding`.\n\n# Rules of Operations & Logic\n1. Customer First: Before creating a project, verify or create the Customer record\n   using `lookup_or_create_customer`.\n2. Estimates vs Change Orders:\n   - Base scope = `create_estimate` (sets the baseline contract value).\n   - Any modifications after initial setup = `create_change_order`.\n   - NEVER overwrite the baseline estimate.\n3. Invoicing: Invoices may include progress percentages of the base estimate OR\n   specific approved change orders as distinct line items.\n3b. Sending an invoice always goes through preview approval: `send_customer_invoice` emails\n   a preview to the PM's own inbox with Approve/Reject links, and the client email is sent\n   only after the PM approves. If the client has no email on file, ask the user for it and\n   call `update_customer_email` first.\n4. Ending calls: when the user says goodbye or the task is finished and the\n   call should end, say a short goodbye and call the `endCall` function so\n   the call actually hangs up.\n5. Communication Style:\n   - Speak in clear, short sentences (10-15 words max).\n   - Confirm critical details (Customer Name, Project Name, Dollar Amounts) before\n     executing tools.\n   - Summarize tool execution outcomes in a single sentence.\n",
+ "systemPrompt": "# Role & Context\nYou are an executive voice project assistant managing 3-4 construction sites. You\ninteract with database systems via tool calls to manage Customers, Projects,\nEstimates, Change Orders, Invoices, and Payroll.\n\n# Setup Status (refreshed automatically at call start)\n- setup_complete: {{setup_complete}}\n- company_name: {{company_name}}\n- pm_preferred_name: {{pm_preferred_name}}\n\nIf setup_complete is false, run the First-Run Setup (Onboarding) section\nbelow BEFORE any other work, even if the caller asks for something else\nfirst - briefly tell them one minute of setup is needed.\n\n{{onboarding_steps}}\n\nFallback if no steps are shown above: ask for the company name, the PM's full\nname, how the PM wants to be addressed daily, the company billing address and GST\nnumber (optional PST number) and payment instructions, then each worker's name,\ntrade, and hourly rate one at a time, and finish with `complete_onboarding`.\n\n# Rules of Operations & Logic\n1. Customer First: Before creating a project, verify or create the Customer record\n   using `lookup_or_create_customer`.\n2. Estimates vs Change Orders:\n   - Base scope = `create_estimate` (sets the baseline contract value).\n   - Any modifications after initial setup = `create_change_order`.\n   - NEVER overwrite the baseline estimate.\n3. Invoicing: An invoice bills a percentage of the project's revised contract value\n   (create_invoice), and the PM can add a short work description shown on the invoice.\n   Billing is percentage-based - there are no manual line items.\n3b. Sending an invoice always goes through preview approval: `send_customer_invoice` emails\n   a preview to the PM's own inbox with Approve/Reject links, and the client email is sent\n   only after the PM approves. If the client has no email on file, ask the user for it and\n   call `update_customer` first.\n4. Ending calls: when the user says goodbye or the task is finished and the\n   call should end, say a short goodbye and call the `endCall` function so\n   the call actually hangs up.\n5. Communication Style:\n   - Speak in clear, short sentences (10-15 words max).\n   - Confirm critical details (Customer Name, Project Name, Dollar Amounts) before\n     executing tools.\n   - Summarize tool execution outcomes in a single sentence.\n",
  "tools": [
   {
    "type": "function",
@@ -676,7 +676,7 @@
    "type": "function",
    "function": {
     "name": "complete_onboarding",
-    "description": "Completes first-run setup: records company name, PM full name, how the PM wants to be addressed daily, and the worker list (name, trade, hourly rate). Call ONLY after gathering all fields from the user.",
+    "description": "Completes first-run setup: registers the company + PM and optionally captures billing details (company billing address, GST number, optional PST number, payment instructions) and the worker list. Re-runs are safe and keep the original completion date. Only call after collecting the company name, PM name, preferred name, and worker list.",
     "parameters": {
      "type": "object",
      "properties": {
@@ -716,6 +716,34 @@
          "hourly_rate"
         ]
        }
+      },
+      "street_address": {
+       "type": "string",
+       "description": "Company billing street address (invoice header)"
+      },
+      "city": {
+       "type": "string",
+       "description": "Company billing city"
+      },
+      "province": {
+       "type": "string",
+       "description": "Company billing province"
+      },
+      "postal_code": {
+       "type": "string",
+       "description": "Company billing postal code"
+      },
+      "gst_reg_number": {
+       "type": "string",
+       "description": "Company GST/HST registration number"
+      },
+      "pst_reg_number": {
+       "type": "string",
+       "description": "Company BC PST registration number (optional)"
+      },
+      "payment_instructions": {
+       "type": "string",
+       "description": "Free-text how-to-pay instructions for invoices"
       }
      },
      "required": [
@@ -734,8 +762,8 @@
   {
    "type": "function",
    "function": {
-    "name": "update_customer_email",
-    "description": "Sets or fixes the email address on a customer record. Validates the format - if it looks invalid it returns an error and nothing is saved. When a send flow reported a missing client email, call this with the address the PM provides, then retry the send.",
+    "name": "update_customer",
+    "description": "Updates a customer record: email (validated - a malformed address is refused and nothing is saved), phone, and billing address. Provide only the fields to change. If a send flow reported a missing client email, call this with the address the PM provides, then retry the send.",
     "parameters": {
      "type": "object",
      "properties": {
@@ -746,12 +774,61 @@
       "email": {
        "type": "string",
        "description": "New email address"
+      },
+      "phone": {
+       "type": "string",
+       "description": "Optional phone number to set"
+      },
+      "street_address": {
+       "type": "string",
+       "description": "Optional billing street address"
+      },
+      "city": {
+       "type": "string",
+       "description": "Optional billing city"
+      },
+      "province": {
+       "type": "string",
+       "description": "Optional billing province/state"
+      },
+      "postal_code": {
+       "type": "string",
+       "description": "Optional billing postal/ZIP code"
       }
      },
      "required": [
       "customer_id",
       "email"
      ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "update_company_billing",
+    "description": "Updates the company's invoice billing details: GST registration number, PST registration number (optional), and free-text payment instructions shown on client invoices (\"How to pay\" block). Provide only the fields to change.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "gst_reg_number": {
+       "type": "string",
+       "description": "GST/HST registration number (e.g. 123456789RT0001)"
+      },
+      "pst_reg_number": {
+       "type": "string",
+       "description": "BC PST registration number (optional)"
+      },
+      "payment_instructions": {
+       "type": "string",
+       "description": "Free-text how-to-pay instructions, e.g. \"E-transfer to pay@ireh.ca - reference the invoice number.\""
+      }
+     },
+     "required": []
     }
    },
    "server": {

@@ -1,3 +1,13 @@
+# NEXT STEPS — status 2026-09-05 (invoice presentation & capture done)
+
+## DONE 2026-09-05 build 2 — invoice presentation + capture
+GST/PST numbers, free-text payment instructions, structured customer bill-to,
+dynamic holdback label, type translation, descriptive auto billing line
+(snapshots billing_percentage/billed_basis), onboarding captures company billing
+details, update_customer (consolidated editor) + update_company_billing voice
+tools. db/0023 + 0024 live; gateway + approve + hook redeployed; Vapi 25 tools.
+Details + decisions D25-D30 + QA: doc/INVOICE_REVIEW_NOTES.md (bottom).
+
 # NEXT STEPS — status 2026-09-05 (invoice lifecycle build done)
 
 ## DONE 2026-09-05 — invoice generation/regen overhaul (overnight build, plan approved)

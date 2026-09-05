@@ -239,3 +239,81 @@ Pre-apply backup: /home/ubuntu/backups/pm/pre-invoice-fixes-20260905-084813.sql.
 4. Change the client email (wrong address) then resend -> works.
 5. list_invoices / "who owes me money" now surfaces sent invoices as UNPAID/
    OVERDUE instead of hiding them as DRAFT.
+
+---
+
+# 2026-09-05 build 2 — invoice presentation & capture (decisions D25–D30)
+
+User-directed additions to what appears on the client invoice, agreed in
+discussion: free-text payment instructions, structured customer bill-to address,
+percentage-only billing with a descriptive auto-line, dynamic holdback label,
+raw-type translation, company tax numbers; onboarding captures the new company
+fields and everything is voice-editable later. Migrations 0023 + 0024 applied
+live (hermetic + live verified); voice-gateway + approve-invoice +
+vapi-assistant-hook redeployed (active); Vapi re-synced (25 tools; stale
+update_customer_email resource deleted). Pre-apply backup:
+/home/ubuntu/backups/pm/pre-invoice-presentation-20260905-*.sql.
+
+## What changed
+- company_profile += gst_reg_number, pst_reg_number, payment_instructions (free
+  text "How to pay" block). customers += structured street_address / city /
+  province / postal_code (bill-to). invoices += billing_percentage +
+  billed_basis (snapshots so the descriptive line never misstates the basis
+  after a contract change; legacy rows render a plain type label).
+- Client invoice (single template — gateway Render Invoice HTML; approve's
+  legacy fallback kept in sync via the shared builder): company tax numbers
+  under the header when present; Bill-to block when the customer has an
+  address; How-to-pay block when instructions exist; Holdback label shows the
+  ACTUAL retention rate ("Holdback (10% retained)" derived from
+  company_profile.retention_rate, not hardcoded); invoice type displayed via a
+  translation map (DEPOSIT -> Deposit, PROGRESS_BILLING -> Progress billing,
+  etc.); the net row is a descriptive line = free-text description when set,
+  else "Progress billing — 50% of revised contract value ($52,500.00)" from the
+  snapshots.
+- update_customer_email -> update_customer (consolidated): one customer editor
+  for email (validated) + phone + address; SQL returns single outcome
+  OK / INVALID_EMAIL / NOT_FOUND. All spoken texts + tool descriptions updated.
+- New tool update_company_billing: GST/PST numbers + payment instructions,
+  partial COALESCE update on company_profile id 1 (Step 3 resolves the company).
+- Onboarding (hook onboarding_steps + complete_onboarding tool + gateway node):
+  now also asks for company billing address, GST number, optional PST number,
+  and payment instructions (read back for confirmation) before the worker list.
+- Vapi prompt: rule 3 rewritten (percentage billing, no line items — the old
+  text promised change-order line items that never existed); references to the
+  renamed tool fixed; onboarding fallback text extended.
+
+## Decisions D25–D30
+- D25: payment_instructions is free text (banks/cheques/etransfer vary too much
+  for structured columns); rendered verbatim with line breaks.
+- D26: customer bill-to is STRUCTURED (street/city/province/postal) per user.
+- D27: billing stays percentage-only with ONE descriptive line (description or
+  auto-generated from snapshots); no true line items — the invoice_line_items
+  itemization build remains future.
+- D28: company tax numbers + payment instructions + billing address are
+  collected in onboarding AND editable later by voice (update_company_billing).
+- D29: display-only translation for invoice_type (DB stays canonical; legacy
+  friendly spellings also mapped so old rows render sanely).
+- D30: template renders each block only when its data exists (no empty
+  "GST #" / "Bill to" / "$0.00" noise).
+
+## Verified
+- Hermetic: fresh-chain migrations incl. 0023/0024 idempotent re-runs.
+- Template: the deployed buildClientInvoiceHtml executed against a fixture in a
+  node harness — GST #, PST #, bill-to block, how-to-pay block, "Holdback (10%
+  retained)" from rate, "Progress billing" translation, auto descriptive line
+  "$52,500.00", and total all asserted.
+- Live SQL: update_company_billing partial update and update_customer
+  (multi-field OK; invalid email -> INVALID_EMAIL, nothing saved) — rolled back.
+- Deployed exports carry all markers; gateway + approve webhooks 200.
+
+## Manual QA for the PM (next interaction)
+1. Voice onboarding on a fresh company (or update_company_billing now):
+   supply GST number + payment instructions -> confirm invoice shows them.
+2. "create a progress invoice for Oakridge at 50%" -> INV-00xx; the client
+   invoice should show: company GST #, Bill to (Dave Miller / Miller Homes
+   address once set via update_customer), the descriptive line with basis, and
+   How to pay.
+3. "update the customer Dave Miller's address to ..." then re-send a preview
+   -> bill-to block appears.
+4. Set a different retention_rate on the company (test) -> holdback label
+   follows it.

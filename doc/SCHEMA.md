@@ -1,6 +1,6 @@
 # Database Schema — live (generated)
 
-> **Generated 2026-09-05 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0021 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
+> **Generated 2026-09-05 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0023 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
 
 ## Conventions
 - Every business table PK is `id UUID DEFAULT uuid_generate_v4()` (uuid-ossp).
@@ -55,9 +55,12 @@
 | `setup_completed_at` | `timestamp with time zone` | NULL until onboarding completes; set once, preserved on re-runs |
 | `created_by_user` | `uuid` |  |
 | `invoice_last_number` | `integer` | NOT NULL, default 0 |
+| `gst_reg_number` | `character varying(50)` |  |
+| `pst_reg_number` | `character varying(50)` |  |
+| `payment_instructions` | `text` | Free-text how-to-pay block shown on client invoices |
 - FK: `created_by_user` → `users(id)` (ON DELETE NO ACTION)
 
-*created in 0007_company_profile; extended in 0014_schedule, 0016_onboarding, 0019_tenant_columns, 0021_invoice_fixes*
+*created in 0007_company_profile; extended in 0014_schedule, 0016_onboarding, 0019_tenant_columns, 0021_invoice_fixes, 0023_invoice_presentation*
 
 ### users
 
@@ -90,11 +93,15 @@
 | `phone` | `character varying(50)` |  |
 | `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
 | `company_id` | `smallint` | NOT NULL, default 1, tenant |
+| `street_address` | `text` |  |
+| `city` | `character varying(100)` |  |
+| `province` | `character varying(50)` |  |
+| `postal_code` | `character varying(20)` |  |
 - FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
 - index `idx_customers_company`
 - UNIQUE index `uq_customers_company_email` (per-company unique; Step 2)
 
-*created in 0001_init; extended in 0019_tenant_columns*
+*created in 0001_init; extended in 0019_tenant_columns, 0023_invoice_presentation*
 
 ### projects
 
@@ -149,13 +156,15 @@
 | `company_id` | `smallint` | NOT NULL, default 1, tenant |
 | `description` | `text` |  |
 | `last_client_html` | `text` | Canonical client HTML stored at preview time; approve workflow emails this copy |
+| `billing_percentage` | `numeric(6,2)` | Snapshot: percent of revised contract value billed at creation |
+| `billed_basis` | `numeric(12,2)` | Snapshot: revised contract value the invoice percentage was applied to |
 - FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
 - FK: `project_id` → `projects(id)` (ON DELETE CASCADE)
 - index `idx_invoices_company`
 - index `idx_invoices_project`
 - UNIQUE index `uq_invoices_company_invoice_number` (per-company unique; Step 2)
 
-*created in 0001_init; extended in 0009_tax_payments, 0018_invoice_send, 0019_tenant_columns, 0021_invoice_fixes*
+*created in 0001_init; extended in 0009_tax_payments, 0018_invoice_send, 0019_tenant_columns, 0021_invoice_fixes, 0023_invoice_presentation*
 
 ### invoice_line_items
 

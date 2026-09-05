@@ -67,7 +67,7 @@
         "conditions": [
          {
           "leftValue": "={{ $json.action }}",
-          "rightValue": "update_customer_email",
+          "rightValue": "update_customer",
           "operator": {
            "type": "string",
            "operation": "equals"
@@ -77,7 +77,7 @@
         "combinator": "and"
        },
        "renameOutput": true,
-       "outputKey": "update_customer_email"
+       "outputKey": "update_customer"
       },
       {
        "conditions": {
@@ -562,6 +562,28 @@
        },
        "renameOutput": true,
        "outputKey": "complete_onboarding"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "strict"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.action }}",
+          "rightValue": "update_company_billing",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "update_company_billing"
       }
      ]
     },
@@ -696,7 +718,7 @@
   {
    "parameters": {
     "operation": "executeQuery",
-    "query": "WITH cp AS (\n  SELECT cp.* FROM company_profile cp JOIN projects p ON p.id = $1 AND p.company_id = cp.id\n), seq AS (\n  UPDATE company_profile SET invoice_last_number = invoice_last_number + 1\n   WHERE id = (SELECT id FROM cp) RETURNING invoice_last_number\n)\nINSERT INTO invoices (company_id, project_id, invoice_number, invoice_type,\n                      net_amount, gst_amount, pst_amount, pst_applicable,\n                      amount_due, holdback_amount, description, status,\n                      issued_date, due_date)\nSELECT cp.id, p.id,\n       cp.invoice_prefix || LPAD(seq.invoice_last_number::text, 4, '0'),\n       $2,\n       ROUND(p.revised_contract_value * ($3 / 100.0), 2),\n       ROUND(p.revised_contract_value * ($3 / 100.0) * cp.gst_rate, 2),\n       CASE WHEN $4 THEN ROUND(p.revised_contract_value * ($3 / 100.0) * cp.pst_rate, 2) ELSE 0.00 END,\n       $4,\n       ROUND(p.revised_contract_value * ($3 / 100.0) * (1 + cp.gst_rate + CASE WHEN $4 THEN cp.pst_rate ELSE 0 END), 2),\n       CASE WHEN $2 = 'FINAL' THEN 0.00\n            ELSE ROUND(ROUND(p.revised_contract_value * ($3 / 100.0), 2) * cp.retention_rate, 2) END,\n       NULLIF(btrim($5), ''),\n       'DRAFT', CURRENT_DATE, CURRENT_DATE + cp.invoice_due_days * INTERVAL '1 day'\nFROM projects p, cp, seq\nWHERE p.id = $1\nRETURNING id, invoice_number, net_amount, gst_amount, pst_amount, amount_due, holdback_amount;",
+    "query": "WITH cp AS (\n  SELECT cp.* FROM company_profile cp JOIN projects p ON p.id = $1 AND p.company_id = cp.id\n), seq AS (\n  UPDATE company_profile SET invoice_last_number = invoice_last_number + 1\n   WHERE id = (SELECT id FROM cp) RETURNING invoice_last_number\n)\nINSERT INTO invoices (company_id, project_id, invoice_number, invoice_type,\n                      net_amount, gst_amount, pst_amount, pst_applicable,\n                      amount_due, holdback_amount, description, billing_percentage,\n                      billed_basis, status, issued_date, due_date)\nSELECT cp.id, p.id,\n       cp.invoice_prefix || LPAD(seq.invoice_last_number::text, 4, '0'),\n       $2,\n       ROUND(p.revised_contract_value * ($3 / 100.0), 2),\n       ROUND(p.revised_contract_value * ($3 / 100.0) * cp.gst_rate, 2),\n       CASE WHEN $4 THEN ROUND(p.revised_contract_value * ($3 / 100.0) * cp.pst_rate, 2) ELSE 0.00 END,\n       $4,\n       ROUND(p.revised_contract_value * ($3 / 100.0) * (1 + cp.gst_rate + CASE WHEN $4 THEN cp.pst_rate ELSE 0 END), 2),\n       CASE WHEN $2 = 'FINAL' THEN 0.00\n            ELSE ROUND(ROUND(p.revised_contract_value * ($3 / 100.0), 2) * cp.retention_rate, 2) END,\n       NULLIF(btrim($5), ''),\n       $3, ROUND(p.revised_contract_value, 2),\n       'DRAFT', CURRENT_DATE, CURRENT_DATE + cp.invoice_due_days * INTERVAL '1 day'\nFROM projects p, cp, seq\nWHERE p.id = $1\nRETURNING id, invoice_number, net_amount, gst_amount, pst_amount, amount_due, holdback_amount, billing_percentage, billed_basis;",
     "options": {
      "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.invoice_type, ($json.toolArgs.billing_percentage ?? 100), ($json.toolArgs.pst_applicable ?? false), ($json.toolArgs.description ?? null)] }}"
     }
@@ -742,7 +764,7 @@
   {
    "parameters": {
     "operation": "executeQuery",
-    "query": "SELECT i.id, i.invoice_number, i.invoice_type, i.net_amount, i.gst_amount, i.pst_amount,\n       i.amount_due, i.holdback_amount, i.description, i.status, i.email_sent_at,\n       i.issued_date, i.due_date, i.company_id,\n       p.title AS project_name, c.name AS customer_name, c.id AS customer_id, c.email,\n       cp.company_name, cp.email_from_name, cp.email_from, cp.street_address, cp.city,\n       cp.province, cp.postal_code, cp.phone, cp.signature_name, cp.brand_primary_color,\n       cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url\nFROM invoices i\nJOIN projects p ON p.id = i.project_id\nJOIN customers c ON c.id = p.customer_id\nJOIN company_profile cp ON cp.id = p.company_id\nWHERE i.id::text = $1 OR i.invoice_number = $1\nLIMIT 1;",
+    "query": "SELECT i.id, i.invoice_number, i.invoice_type, i.net_amount, i.gst_amount, i.pst_amount,\n       i.amount_due, i.holdback_amount, i.description, i.status, i.email_sent_at,\n       i.issued_date, i.due_date, i.company_id, i.billing_percentage, i.billed_basis,\n       p.title AS project_name, c.name AS customer_name, c.company_name AS customer_company,\n       c.id AS customer_id, c.email, c.phone AS customer_phone,\n       c.street_address AS bill_street, c.city AS bill_city, c.province AS bill_province,\n       c.postal_code AS bill_postal,\n       cp.company_name, cp.email_from_name, cp.email_from, cp.street_address, cp.city,\n       cp.province, cp.postal_code, cp.phone, cp.signature_name, cp.brand_primary_color,\n       cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url,\n       cp.gst_reg_number, cp.pst_reg_number, cp.payment_instructions, cp.retention_rate\nFROM invoices i\nJOIN projects p ON p.id = i.project_id\nJOIN customers c ON c.id = p.customer_id\nJOIN company_profile cp ON cp.id = p.company_id\nWHERE i.id::text = $1 OR i.invoice_number = $1\nLIMIT 1;",
     "options": {
      "queryReplacement": "={{ [$json.toolArgs.invoice_id] }}"
     }
@@ -765,7 +787,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const inv = $input.first()?.json;\nconst money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\nconst company = inv?.company_name ?? 'Ireh Construction';\nconst accent = inv?.brand_accent_color ?? '#2563eb';\nconst primary = inv?.brand_primary_color ?? '#1a3a5c';\nconst addressLine = [inv?.street_address, inv?.city, `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`].filter(Boolean).join(', ');\nconst html = `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 2rem; }\n  .header { display: flex; justify-content: space-between; border-bottom: 2px solid ${primary}; padding-bottom: 1rem; }\n  .title { font-size: 1.5rem; font-weight: 700; color: ${primary}; }\n  .co { color: #64748b; font-size: .85rem; }\n  .row { display: flex; justify-content: space-between; padding: .4rem 0; }\n  .total { font-size: 1.3rem; font-weight: 700; border-top: 2px solid ${primary}; margin-top: 1rem; padding-top: 1rem; }\n  @media print { body { margin: 0; } }\n</style></head><body>\n  <div class=\"header\">\n    <div><div class=\"title\">${company}</div><div class=\"co\">${addressLine}</div><div class=\"co\">${inv?.phone ?? ''}</div></div>\n    <div style=\"text-align:right\"><div class=\"title\">Invoice</div><div>${inv?.invoice_number ?? ''}</div><div>Issued: ${inv?.issued_date ?? ''}</div><div>Due: ${inv?.due_date ?? ''}</div></div>\n  </div>\n  <p><strong>Project:</strong> ${inv?.project_name ?? ''}</p>\n  <p><strong>Customer:</strong> ${inv?.customer_name ?? ''}</p>\n  <p><strong>Type:</strong> ${inv?.invoice_type ?? ''}</p>\n  ${inv?.description ? `<p><strong>Description:</strong> ${inv.description}</p>` : ''}\n  <div class=\"row\"><span>Subtotal (net)</span><span>${money(inv?.net_amount)}</span></div>\n  ${Number(inv?.gst_amount) ? `<div class=\"row\"><span>GST</span><span>${money(inv?.gst_amount)}</span></div>` : ''}\n  ${Number(inv?.pst_amount) ? `<div class=\"row\"><span>PST</span><span>${money(inv?.pst_amount)}</span></div>` : ''}\n  ${Number(inv?.holdback_amount) ? `<div class=\"row\"><span>Holdback (10% retained)</span><span>${money(inv?.holdback_amount)}</span></div>` : ''}\n  <div class=\"total\">Total due ${money(inv?.amount_due)}</div>\n</body></html>`;\nreturn [{ json: { ...inv, invoiceHtml: html } }];"
+    "jsCode": "const inv = $input.first()?.json;\nfunction buildClientInvoiceHtml(inv) {\n  const money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\n  const company = inv?.company_name ?? 'Ireh Construction';\n  const primary = inv?.brand_primary_color ?? '#1a3a5c';\n  const accent = inv?.brand_accent_color ?? '#2563eb';\n  const addressLine = [inv?.street_address, inv?.city, `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`].filter(Boolean).join(', ');\n  const typeMap = { 'DEPOSIT': 'Deposit', 'PROGRESS_BILLING': 'Progress billing', 'CHANGE_ORDER': 'Change order',\n                    'FINAL': 'Final', 'Deposit': 'Deposit', 'Progress': 'Progress billing',\n                    'Change Order': 'Change order', 'Final': 'Final' };\n  const typeLabel = typeMap[inv?.invoice_type] || inv?.invoice_type || '';\n  const holdbackPct = inv?.retention_rate != null ? Math.round(Number(inv.retention_rate) * 100) : 10;\n  const taxLines = [];\n  if (inv?.gst_reg_number) taxLines.push(`<div class=\"co\">GST # ${inv.gst_reg_number}</div>`);\n  if (inv?.pst_reg_number) taxLines.push(`<div class=\"co\">PST # ${inv.pst_reg_number}</div>`);\n  const pct = inv?.billing_percentage;\n  const basis = inv?.billed_basis;\n  const lineLabel = inv?.description\n    ? String(inv.description)\n    : (pct != null && basis != null)\n      ? `${typeLabel} \\u2014 ${String(Number(pct))}% of revised contract value (${money(basis)})`\n      : typeLabel || 'Services';\n  const billTo = [inv?.bill_street, inv?.bill_city, inv?.bill_province ? `${inv?.bill_province} ${inv?.bill_postal ?? ''}` : inv?.bill_postal]\n    .map(s => (s || '').toString().trim()).filter(Boolean);\n  const showBillTo = billTo.length > 0;\n  const payLines = (inv?.payment_instructions || '').split('\\n').filter(s => s.trim().length > 0);\n  return `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 2rem; }\n  .header { display: flex; justify-content: space-between; border-bottom: 2px solid ${primary}; padding-bottom: 1rem; }\n  .title { font-size: 1.5rem; font-weight: 700; color: ${primary}; }\n  .co { color: #64748b; font-size: .85rem; }\n  .row { display: flex; justify-content: space-between; padding: .4rem 0; }\n  .total { font-size: 1.3rem; font-weight: 700; border-top: 2px solid ${primary}; margin-top: 1rem; padding-top: 1rem; }\n  .billto { border-left: 3px solid ${accent}; padding-left: .75rem; margin: .75rem 0; color: #334155; }\n  .pay { border-top: 1px solid #cbd5e1; margin-top: 1.5rem; padding-top: .75rem; color: #475569; font-size: .9rem; }\n  @media print { body { margin: 0; } }\n</style></head><body>\n  <div class=\"header\">\n    <div><div class=\"title\">${company}</div><div class=\"co\">${addressLine}</div><div class=\"co\">${inv?.phone ?? ''}</div>${taxLines.join('')}</div>\n    <div style=\"text-align:right\"><div class=\"title\">Invoice</div><div>${inv?.invoice_number ?? ''}</div><div>Issued: ${inv?.issued_date ?? ''}</div><div>Due: ${inv?.due_date ?? ''}</div></div>\n  </div>\n  <p><strong>Project:</strong> ${inv?.project_name ?? ''}</p>\n  <p><strong>Customer:</strong> ${inv?.customer_name ?? ''}${inv?.customer_company ? ` (${inv.customer_company})` : ''}</p>\n  ${showBillTo ? `<div class=\"billto\"><strong>Bill to</strong><br>${billTo.join('<br>')}</div>` : ''}\n  <p><strong>Type:</strong> ${typeLabel || '\\u2014'}</p>\n  <div class=\"row\"><span>${lineLabel}</span><span>${money(inv?.net_amount)}</span></div>\n  ${Number(inv?.gst_amount) ? `<div class=\"row\"><span>GST</span><span>${money(inv?.gst_amount)}</span></div>` : ''}\n  ${Number(inv?.pst_amount) ? `<div class=\"row\"><span>PST</span><span>${money(inv?.pst_amount)}</span></div>` : ''}\n  ${Number(inv?.holdback_amount) ? `<div class=\"row\"><span>Holdback (${holdbackPct}% retained)</span><span>${money(inv?.holdback_amount)}</span></div>` : ''}\n  <div class=\"total\">Total due ${money(inv?.amount_due)}</div>\n  ${payLines.length ? `<div class=\"pay\"><strong>How to pay</strong><br>${payLines.join('<br>')}</div>` : ''}\n</body></html>`; }\nconst html = buildClientInvoiceHtml(inv);\nreturn [{ json: { ...inv, invoiceHtml: html } }];"
    },
    "id": "gate-0011a",
    "name": "Render Invoice HTML",
@@ -946,7 +968,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const toolCall = $('Normalize Tool Call').first().json;\nconst dbRow = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\n\nlet spoken = 'Done.';\nswitch (toolCall.action) {\n  case 'lookup_or_create_customer':\n    spoken = 'Customer ready.';\n    break;\n  case 'create_project':\n    spoken = 'Project created.';\n    break;\n  case 'create_estimate':\n    spoken = 'Baseline estimate recorded.';\n    break;\n  case 'create_change_order':\n    spoken = dbRow && dbRow.id ? `Change order ${dbRow.change_order_number} recorded.` : 'Could not create change order - baseline estimate must be approved first.';\n    break;\n  case 'log_timesheet':\n    spoken = dbRow && dbRow.id ? 'Hours logged.' : 'Worker not found - add the worker first.';\n    break;\n  case 'create_invoice':\n    spoken = dbRow && dbRow.invoice_number\n      ? `Draft invoice ${dbRow.invoice_number} created for $${Number(dbRow.amount_due).toLocaleString()} (incl. tax)${Number(dbRow.holdback_amount) > 0 ? `, with $${Number(dbRow.holdback_amount).toLocaleString()} holdback retained` : ''}.`\n      : 'Could not create the invoice - confirm the project and that its contract value is set, then try again.';\n    break;\n  case 'send_customer_invoice': {\n    const row = $('Exec: send_customer_invoice_lookup').first().json;\n    if (!row || !row.invoice_number) {\n      spoken = 'Invoice not found. Ask the user to confirm the invoice number or project, then try again.';\n    } else if (!row.email) {\n      spoken = `Customer ${row.customer_name} has no email address on file. Ask the user for the client's email, call update_customer_email, then retry sending the invoice.`;\n    } else {\n      const wasSent = row.email_sent_at\n        ? ` This invoice was already sent to the client on ${String(row.email_sent_at).slice(0, 10)} - approving again will resend it.`\n        : '';\n      spoken = `Preview emailed to you at ${row.email_from || 'your inbox'}. Review it there and tap Approve to send it to ${row.customer_name}, or Reject to cancel.${wasSent}`;\n    }\n    break;\n  }\n  case 'get_project_statement':\n    spoken = dbRow\n      ? `${dbRow.project_name} (${dbRow.customer_name}): Revised contract is $${Number(dbRow.total_revised_contract_value).toLocaleString()}, $${Number(dbRow.total_paid).toLocaleString()} collected. Outstanding balance is $${Number(dbRow.balance_remaining).toLocaleString()}.`\n      : 'Project not found.';\n    break;\n  case 'get_estimate_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-estimate?token=${dbRow.approval_token}` : 'Project not found.';\n    break;\n  case 'get_change_order_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-change-order?token=${dbRow.approval_token}` : 'Change order not found.';\n    break;\n  case 'send_estimate_for_approval': {\n    const row = $('Exec: send_estimate_for_approval_lookup').first().json;\n    if (!row || !row.email) {\n      spoken = row ? 'The client has no email address on file. Ask the user for it, call update_customer_email, then retry.' : 'Project or customer not found.';\n    } else {\n      spoken = 'Approval link emailed to the client.';\n    }\n    break;\n  }\n  case 'send_change_order_for_approval': {\n    const row = $('Exec: send_change_order_for_approval_lookup').first().json;\n    if (!row || !row.email) {\n      spoken = row ? 'The client has no email address on file. Ask the user for it, call update_customer_email, then retry.' : 'Change order not found.';\n    } else {\n      spoken = 'Change order approval link emailed to the client.';\n    }\n    break;\n  }\n  case 'update_customer_email':\n    spoken = !dbRow || dbRow.outcome === 'NOT_FOUND'\n      ? 'Customer not found - ask the user for the customer full name or ID, then try again.'\n      : dbRow.outcome === 'INVALID_EMAIL'\n        ? 'That does not look like a valid email address. Please ask the user for a correct address, then call update_customer_email again.'\n        : `Email updated for ${dbRow.name}: ${dbRow.email}.`;\n    break;\n    case 'record_payment':\n    spoken = dbRow && dbRow.invoice_number\n      ? `Payment recorded. ${dbRow.invoice_number} is now ${(dbRow.status || '').toLowerCase()}; balance due $${Number(dbRow.balance_due).toLocaleString()}.`\n      : 'Invoice not found.';\n    break;\n  case 'run_payroll':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll computed for ${dbRow.period_start} to ${dbRow.period_end}: ${dbRow.workers} worker(s), $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net.`\n      : 'No timesheets found for that period.';\n    break;\n  case 'get_payroll_summary':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll for ${dbRow.period_start} to ${dbRow.period_end}: $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net (${dbRow.workers} workers).`\n      : 'No payroll run found.';\n    break;\n  case 'add_worker':\n    spoken = dbRow && dbRow.worker_code\n      ? `Worker ${dbRow.name} added as ${dbRow.worker_code}${dbRow.trade ? ' (' + dbRow.trade + ')' : ''}.`\n      : 'Could not add worker.';\n    break;\n  case 'get_dashboard_summary': {\n    const rows = $input.all().map(i => i.json);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name}: contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_projects': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.project_name);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name} (${r.project_status}): contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_invoices': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.invoice_number);\n    if (!rows.length) { spoken = 'No invoices found.'; }\n    else {\n      spoken = rows.map(r => `${r.invoice_number} ${r.project_name}: $${Number(r.amount_due).toLocaleString()} (${r.status}), balance $${Number(r.balance_due).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'get_schedule': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.title);\n    if (!rows.length) { spoken = 'Nothing scheduled in that window.'; }\n    else {\n      spoken = rows.map(r => {\n        let when = 'no date';\n        if (r.due_date) {\n          const parts = String(r.due_date).slice(0, 10).split('-').map(Number);\n          if (parts.length === 3 && parts.every(n => !isNaN(n))) {\n            const due = new Date(parts[0], parts[1] - 1, parts[2]);\n            const now = new Date(); now.setHours(0, 0, 0, 0);\n            const diff = Math.round((due - now) / 86400000);\n            when = diff < 0 ? (Math.abs(diff) + ' days overdue') : diff === 0 ? 'today' : diff === 1 ? 'tomorrow' : ('in ' + diff + ' days');\n          }\n        }\n        return `${r.title} ${when}${r.project_name ? ' (' + r.project_name + ')' : ''}`;\n      }).join('. ');\n    }\n    break;\n  }\n  case 'set_briefing_time': {\n    spoken = dbRow && dbRow.briefing_time ? `Daily briefing set to ${String(dbRow.briefing_time).slice(0, 5)}.` : 'Could not update briefing time.';\n    break;\n  }\n  case 'get_onboarding_status':\n    spoken = dbRow && dbRow.setup_completed\n      ? `Setup is complete. ${dbRow.company_name}, ${dbRow.worker_count} active worker${dbRow.worker_count === 1 ? '' : 's'} on file.`\n      : 'Setup is not complete yet. Let us start - what is the company name?';\n    break;\n  case 'complete_onboarding':\n    spoken = dbRow && dbRow.company_name\n      ? `All set, ${dbRow.pm_preferred_name || 'boss'}. ${dbRow.company_name} is registered with ${dbRow.worker_count} worker${dbRow.worker_count === 1 ? '' : 's'} on file. Anything else?`\n      : 'Setup did not complete. Please try again.';\n    break;\n  default:\n    spoken = `I'm not sure how to handle \"${toolCall.action}\". Please rephrase, or ask for something like project status, estimates, invoices, payments, or payroll.`;\n}\n\nreturn [{\n  json: {\n    toolCallId: toolCall.toolCallId,\n    result: spoken,\n  },\n}];"
+    "jsCode": "const toolCall = $('Normalize Tool Call').first().json;\nconst dbRow = $input.first()?.json;\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\n\nlet spoken = 'Done.';\nswitch (toolCall.action) {\n  case 'lookup_or_create_customer':\n    spoken = 'Customer ready.';\n    break;\n  case 'create_project':\n    spoken = 'Project created.';\n    break;\n  case 'create_estimate':\n    spoken = 'Baseline estimate recorded.';\n    break;\n  case 'create_change_order':\n    spoken = dbRow && dbRow.id ? `Change order ${dbRow.change_order_number} recorded.` : 'Could not create change order - baseline estimate must be approved first.';\n    break;\n  case 'log_timesheet':\n    spoken = dbRow && dbRow.id ? 'Hours logged.' : 'Worker not found - add the worker first.';\n    break;\n  case 'create_invoice':\n    spoken = dbRow && dbRow.invoice_number\n      ? `Draft invoice ${dbRow.invoice_number} created for $${Number(dbRow.amount_due).toLocaleString()} (incl. tax)${Number(dbRow.holdback_amount) > 0 ? `, with $${Number(dbRow.holdback_amount).toLocaleString()} holdback retained` : ''}.`\n      : 'Could not create the invoice - confirm the project and that its contract value is set, then try again.';\n    break;\n  case 'send_customer_invoice': {\n    const row = $('Exec: send_customer_invoice_lookup').first().json;\n    if (!row || !row.invoice_number) {\n      spoken = 'Invoice not found. Ask the user to confirm the invoice number or project, then try again.';\n    } else if (!row.email) {\n      spoken = `Customer ${row.customer_name} has no email address on file. Ask the user for the client's email, call update_customer to set the client email, then retry sending the invoice.`;\n    } else {\n      const wasSent = row.email_sent_at\n        ? ` This invoice was already sent to the client on ${String(row.email_sent_at).slice(0, 10)} - approving again will resend it.`\n        : '';\n      spoken = `Preview emailed to you at ${row.email_from || 'your inbox'}. Review it there and tap Approve to send it to ${row.customer_name}, or Reject to cancel.${wasSent}`;\n    }\n    break;\n  }\n  case 'get_project_statement':\n    spoken = dbRow\n      ? `${dbRow.project_name} (${dbRow.customer_name}): Revised contract is $${Number(dbRow.total_revised_contract_value).toLocaleString()}, $${Number(dbRow.total_paid).toLocaleString()} collected. Outstanding balance is $${Number(dbRow.balance_remaining).toLocaleString()}.`\n      : 'Project not found.';\n    break;\n  case 'get_estimate_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-estimate?token=${dbRow.approval_token}` : 'Project not found.';\n    break;\n  case 'get_change_order_approval_link':\n    spoken = dbRow && dbRow.approval_token ? `Approval link ready: ${base}/webhook/approve-change-order?token=${dbRow.approval_token}` : 'Change order not found.';\n    break;\n  case 'send_estimate_for_approval': {\n    const row = $('Exec: send_estimate_for_approval_lookup').first().json;\n    if (!row || !row.email) {\n      spoken = row ? 'The client has no email address on file. Ask the user for it, call update_customer to set the email, then retry.' : 'Project or customer not found.';\n    } else {\n      spoken = 'Approval link emailed to the client.';\n    }\n    break;\n  }\n  case 'send_change_order_for_approval': {\n    const row = $('Exec: send_change_order_for_approval_lookup').first().json;\n    if (!row || !row.email) {\n      spoken = row ? 'The client has no email address on file. Ask the user for it, call update_customer to set the email, then retry.' : 'Change order not found.';\n    } else {\n      spoken = 'Change order approval link emailed to the client.';\n    }\n    break;\n  }\n  case 'update_customer': {\n    const bits = [];\n    if (dbRow && dbRow.email) bits.push(`email ${dbRow.email}`);\n    if (dbRow && dbRow.phone) bits.push(`phone ${dbRow.phone}`);\n    if (dbRow && (dbRow.street_address || dbRow.city)) {\n      bits.push(`address ${[dbRow.street_address, dbRow.city, dbRow.province].filter(Boolean).join(', ')}${dbRow.postal_code ? ' ' + dbRow.postal_code : ''}`);\n    }\n    spoken = !dbRow || dbRow.outcome === 'NOT_FOUND'\n      ? 'Customer not found - ask the user for the customer full name or ID, then try again.'\n      : dbRow.outcome === 'INVALID_EMAIL'\n        ? 'That does not look like a valid email address. Please ask the user for a correct address, then call update_customer again.'\n        : bits.length ? `Customer ${dbRow.name} updated - ${bits.join(', ')}.` : 'Customer updated.';\n    break;\n  }\n  case 'update_company_billing':\n    spoken = dbRow\n      ? `Company billing details updated${dbRow.gst_reg_number ? ` - GST number ${dbRow.gst_reg_number}` : ''}.`\n      : 'Could not update company billing details.';\n    break;\n    case 'record_payment':\n    spoken = dbRow && dbRow.invoice_number\n      ? `Payment recorded. ${dbRow.invoice_number} is now ${(dbRow.status || '').toLowerCase()}; balance due $${Number(dbRow.balance_due).toLocaleString()}.`\n      : 'Invoice not found.';\n    break;\n  case 'run_payroll':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll computed for ${dbRow.period_start} to ${dbRow.period_end}: ${dbRow.workers} worker(s), $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net.`\n      : 'No timesheets found for that period.';\n    break;\n  case 'get_payroll_summary':\n    spoken = dbRow && dbRow.run_id\n      ? `Payroll for ${dbRow.period_start} to ${dbRow.period_end}: $${Number(dbRow.gross_pay).toLocaleString()} gross, $${Number(dbRow.net_pay).toLocaleString()} net (${dbRow.workers} workers).`\n      : 'No payroll run found.';\n    break;\n  case 'add_worker':\n    spoken = dbRow && dbRow.worker_code\n      ? `Worker ${dbRow.name} added as ${dbRow.worker_code}${dbRow.trade ? ' (' + dbRow.trade + ')' : ''}.`\n      : 'Could not add worker.';\n    break;\n  case 'get_dashboard_summary': {\n    const rows = $input.all().map(i => i.json);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name}: contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_projects': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.project_name);\n    if (!rows.length) { spoken = 'No projects found.'; }\n    else {\n      spoken = rows.map(r => `${r.project_name} (${r.project_status}): contract $${Number(r.total_revised_contract_value).toLocaleString()}, paid $${Number(r.total_paid).toLocaleString()}, balance $${Number(r.balance_remaining).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'list_invoices': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.invoice_number);\n    if (!rows.length) { spoken = 'No invoices found.'; }\n    else {\n      spoken = rows.map(r => `${r.invoice_number} ${r.project_name}: $${Number(r.amount_due).toLocaleString()} (${r.status}), balance $${Number(r.balance_due).toLocaleString()}.`).join(' ');\n    }\n    break;\n  }\n  case 'get_schedule': {\n    const rows = $input.all().map(i => i.json).filter(r => r && r.title);\n    if (!rows.length) { spoken = 'Nothing scheduled in that window.'; }\n    else {\n      spoken = rows.map(r => {\n        let when = 'no date';\n        if (r.due_date) {\n          const parts = String(r.due_date).slice(0, 10).split('-').map(Number);\n          if (parts.length === 3 && parts.every(n => !isNaN(n))) {\n            const due = new Date(parts[0], parts[1] - 1, parts[2]);\n            const now = new Date(); now.setHours(0, 0, 0, 0);\n            const diff = Math.round((due - now) / 86400000);\n            when = diff < 0 ? (Math.abs(diff) + ' days overdue') : diff === 0 ? 'today' : diff === 1 ? 'tomorrow' : ('in ' + diff + ' days');\n          }\n        }\n        return `${r.title} ${when}${r.project_name ? ' (' + r.project_name + ')' : ''}`;\n      }).join('. ');\n    }\n    break;\n  }\n  case 'set_briefing_time': {\n    spoken = dbRow && dbRow.briefing_time ? `Daily briefing set to ${String(dbRow.briefing_time).slice(0, 5)}.` : 'Could not update briefing time.';\n    break;\n  }\n  case 'get_onboarding_status':\n    spoken = dbRow && dbRow.setup_completed\n      ? `Setup is complete. ${dbRow.company_name}, ${dbRow.worker_count} active worker${dbRow.worker_count === 1 ? '' : 's'} on file.`\n      : 'Setup is not complete yet. Let us start - what is the company name?';\n    break;\n  case 'complete_onboarding':\n    spoken = dbRow && dbRow.company_name\n      ? `All set, ${dbRow.pm_preferred_name || 'boss'}. ${dbRow.company_name} is registered with ${dbRow.worker_count} worker${dbRow.worker_count === 1 ? '' : 's'} on file. Anything else?`\n      : 'Setup did not complete. Please try again.';\n    break;\n  default:\n    spoken = `I'm not sure how to handle \"${toolCall.action}\". Please rephrase, or ask for something like project status, estimates, invoices, payments, or payroll.`;\n}\n\nreturn [{\n  json: {\n    toolCallId: toolCall.toolCallId,\n    result: spoken,\n  },\n}];"
    },
    "id": "gate-0012",
    "name": "Format Spoken Result",
@@ -1394,7 +1416,7 @@
   {
    "parameters": {
     "operation": "executeQuery",
-    "query": "UPDATE company_profile\n   SET company_name       = COALESCE(NULLIF($1, ''), company_name),\n       pm_name            = COALESCE(NULLIF($2, ''), pm_name),\n       pm_preferred_name  = COALESCE(NULLIF($3, ''), pm_preferred_name),\n       setup_completed_at = COALESCE(setup_completed_at, now()),\n       updated_at         = now()\n WHERE id = 1\nRETURNING company_name, pm_name, pm_preferred_name,\n          (SELECT count(*) FROM workers WHERE active) AS worker_count;",
+    "query": "UPDATE company_profile\n   SET company_name       = COALESCE(NULLIF($1, ''), company_name),\n       pm_name            = COALESCE(NULLIF($2, ''), pm_name),\n       pm_preferred_name  = COALESCE(NULLIF($3, ''), pm_preferred_name),\n       street_address     = COALESCE(NULLIF($4, ''), street_address),\n       city               = COALESCE(NULLIF($5, ''), city),\n       province           = COALESCE(NULLIF($6, ''), province),\n       postal_code        = COALESCE(NULLIF($7, ''), postal_code),\n       gst_reg_number     = COALESCE(NULLIF($8, ''), gst_reg_number),\n       pst_reg_number     = COALESCE(NULLIF($9, ''), pst_reg_number),\n       payment_instructions = COALESCE(NULLIF($10, ''), payment_instructions),\n       setup_completed_at = COALESCE(setup_completed_at, now()),\n       updated_at         = now()\n WHERE id = 1\nRETURNING company_name, pm_name, pm_preferred_name,\n          (SELECT count(*) FROM workers WHERE active) AS worker_count;",
     "options": {
      "queryReplacement": "={{ [($('Normalize Tool Call').first().json.toolArgs.company_name ?? null), ($('Normalize Tool Call').first().json.toolArgs.pm_name ?? null), ($('Normalize Tool Call').first().json.toolArgs.preferred_name ?? null)] }}"
     }
@@ -1407,29 +1429,6 @@
    "position": [
     960,
     2120
-   ],
-   "credentials": {
-    "postgres": {
-     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-     "name": "Supabase PostgreSQL"
-    }
-   }
-  },
-  {
-   "parameters": {
-    "operation": "executeQuery",
-    "query": "WITH valid AS (\n  SELECT btrim($2::text) AS email\n   WHERE btrim($2::text) ~ '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'\n), upd AS (\n  UPDATE customers c SET email = v.email\n   FROM valid v\n  WHERE c.id::text = $1 OR LOWER(c.name) = LOWER(btrim($1::text))\n  RETURNING c.id, c.name, c.email\n)\nSELECT 'OK'::text AS outcome, u.id, u.name, u.email FROM upd u\nUNION ALL SELECT 'INVALID_EMAIL', NULL, NULL, NULL WHERE NOT EXISTS (SELECT 1 FROM valid)\nUNION ALL SELECT 'NOT_FOUND', NULL, NULL, NULL\n          WHERE EXISTS (SELECT 1 FROM valid) AND NOT EXISTS (SELECT 1 FROM upd);",
-    "options": {
-     "queryReplacement": "={{ [$json.toolArgs.customer_id, $json.toolArgs.email] }}"
-    }
-   },
-   "id": "gate-0040",
-   "name": "Exec: update_customer_email",
-   "type": "n8n-nodes-base.postgres",
-   "typeVersion": 2.5,
-   "position": [
-    960,
-    180
    ],
    "credentials": {
     "postgres": {
@@ -1520,6 +1519,52 @@
      "name": "Supabase PostgreSQL"
     }
    }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH valid AS (\n  SELECT NULLIF(btrim($2::text), '') AS email\n   WHERE $2 IS NULL OR btrim($2::text) ~ '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'\n), upd AS (\n  UPDATE customers c\n     SET email          = COALESCE(v.email, c.email),\n         phone          = COALESCE(NULLIF(btrim($3), ''), c.phone),\n         street_address = COALESCE(NULLIF(btrim($4), ''), c.street_address),\n         city           = COALESCE(NULLIF(btrim($5), ''), c.city),\n         province       = COALESCE(NULLIF(btrim($6), ''), c.province),\n         postal_code    = COALESCE(NULLIF(btrim($7), ''), c.postal_code)\n    FROM valid v\n   WHERE c.id::text = $1 OR LOWER(c.name) = LOWER(btrim($1::text))\n  RETURNING c.id, c.name, c.email, c.phone, c.street_address, c.city, c.province, c.postal_code\n)\nSELECT 'OK'::text AS outcome, u.id, u.name, u.email, u.phone,\n       u.street_address, u.city, u.province, u.postal_code FROM upd u\nUNION ALL SELECT 'INVALID_EMAIL', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL\n          WHERE $2 IS NOT NULL AND btrim($2::text) <> ''\n            AND NOT EXISTS (SELECT 1 FROM valid)\n            AND NOT EXISTS (SELECT 1 FROM upd)\nUNION ALL SELECT 'NOT_FOUND', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL\n          WHERE NOT EXISTS (SELECT 1 FROM upd)\n            AND NOT ($2 IS NOT NULL AND btrim($2::text) <> ''\n                 AND NOT EXISTS (SELECT 1 FROM valid))\nLIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.customer_id, ($json.toolArgs.email ?? null), ($json.toolArgs.phone ?? null), ($json.toolArgs.street_address ?? null), ($json.toolArgs.city ?? null), ($json.toolArgs.province ?? null), ($json.toolArgs.postal_code ?? null)] }}"
+    }
+   },
+   "id": "gate-0040",
+   "name": "Exec: update_customer",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    180
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "UPDATE company_profile\n   SET gst_reg_number      = COALESCE(NULLIF(btrim($1), ''), gst_reg_number),\n       pst_reg_number      = COALESCE(NULLIF(btrim($2), ''), pst_reg_number),\n       payment_instructions = COALESCE(NULLIF(btrim($3), ''), payment_instructions),\n       updated_at = now()\n WHERE id = $4\nRETURNING id, gst_reg_number, pst_reg_number, payment_instructions;",
+    "options": {
+     "queryReplacement": "={{ [$json.toolArgs.gst_reg_number ?? null, $json.toolArgs.pst_reg_number ?? null, $json.toolArgs.payment_instructions ?? null, 1] }}"
+    }
+   },
+   "id": "gate-0041",
+   "name": "Exec: update_company_billing",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    960,
+    1500
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
   }
  ],
  "connections": {
@@ -1556,7 +1601,7 @@
     ],
     [
      {
-      "node": "Exec: update_customer_email",
+      "node": "Exec: update_customer",
       "type": "main",
       "index": 0
      }
@@ -1711,6 +1756,13 @@
     [
      {
       "node": "Exec: complete_onboarding_workers",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Exec: update_company_billing",
       "type": "main",
       "index": 0
      }
@@ -2141,17 +2193,6 @@
     ]
    ]
   },
-  "Exec: update_customer_email": {
-   "main": [
-    [
-     {
-      "node": "Format Spoken Result",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
   "Render Invoice Preview": {
    "main": [
     [
@@ -2186,6 +2227,17 @@
    ]
   },
   "Exec: log_invoice_preview": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: update_customer": {
    "main": [
     [
      {
