@@ -21,7 +21,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const crypto = require('crypto');\nconst data = ($input.first().json || {}).query || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst invoice = String(data.invoice || '').trim();\nconst sig = String(data.sig || '').trim();\nconst expected = crypto.createHmac('sha256', secret).update(invoice).digest('base64url');\nconst ok = invoice.length > 0 && sig === expected;\nreturn [{ json: { ok, invoice, decision: ok ? 'APPROVE' : '' } }];"
+    "jsCode": "const crypto = require('crypto');\nconst data = ($input.first().json || {}).query || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst invoice = String(data.invoice || '').trim();\nconst company = String(data.company ?? '1').trim();\nconst action = String(data.action ?? '').trim();\nconst exp = String(data.exp ?? '').trim();\nconst sig = String(data.sig || '').trim();\nconst resend = String(data.resend || '') === '1';\nlet ok = false, mode = 'invalid';\nif (action === 'approve' && exp) {\n  const expected = crypto.createHmac('sha256', secret).update(`${company}.${invoice}.approve.${exp}`).digest('base64url');\n  ok = sig === expected && Math.floor(Date.now() / 1000) <= Number(exp);\n  if (ok) mode = 'v2';\n} else if (!action && invoice.length > 0) {\n  // legacy link minted before 2026-09-05 (HMAC over invoice number only)\n  const legacy = crypto.createHmac('sha256', secret).update(invoice).digest('base64url');\n  ok = sig === legacy;\n  if (ok) mode = 'legacy';\n}\nreturn [{ json: { ok, invoice, company: company || '1', mode, resend, decision: ok ? 'APPROVE' : '' } }];"
    },
    "id": "inv-02",
    "name": "Verify Signature (Approve)",
@@ -68,9 +68,9 @@
   {
    "parameters": {
     "operation": "executeQuery",
-    "query": "SELECT i.id, i.invoice_number, i.invoice_type, i.net_amount, i.gst_amount, i.pst_amount, i.amount_due, i.holdback_amount, i.issued_date, i.due_date, i.email_sent_at, p.title AS project_name, c.name AS customer_name, c.email, cp.email_from, cp.email_from_name, cp.street_address, cp.city, cp.province, cp.postal_code, cp.phone, cp.signature_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM invoices i JOIN projects p ON p.id = i.project_id JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (i.id::text = $1 OR i.invoice_number = $1) LIMIT 1;",
+    "query": "SELECT i.id, i.invoice_number, i.invoice_type, i.net_amount, i.gst_amount, i.pst_amount,\n       i.amount_due, i.holdback_amount, i.description, i.last_client_html, i.status,\n       i.email_sent_at, i.issued_date, i.due_date, i.company_id,\n       p.title AS project_name, c.name AS customer_name, c.email,\n       cp.email_from, cp.email_from_name, cp.street_address, cp.city, cp.province,\n       cp.postal_code, cp.phone, cp.signature_name, cp.brand_primary_color,\n       cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url\nFROM invoices i\nJOIN projects p ON p.id = i.project_id\nJOIN customers c ON c.id = p.customer_id\nJOIN company_profile cp ON cp.id = p.company_id\nWHERE i.company_id = $2::smallint AND (i.id::text = $1 OR i.invoice_number = $1)\nLIMIT 1;",
     "options": {
-     "queryReplacement": "={{ [$json.invoice] }}"
+     "queryReplacement": "={{ [$json.invoice, $json.company] }}"
     }
    },
    "id": "inv-04",
@@ -124,7 +124,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const inv = $input.first()?.json;\nconst money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\nconst company = inv?.company_name ?? 'Ireh Construction';\nconst accent = inv?.brand_accent_color ?? '#2563eb';\nconst primary = inv?.brand_primary_color ?? '#1a3a5c';\nconst addressLine = [inv?.street_address, inv?.city, `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`].filter(Boolean).join(', ');\nconst html = `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 2rem; }\n  .header { display: flex; justify-content: space-between; border-bottom: 2px solid ${primary}; padding-bottom: 1rem; }\n  .title { font-size: 1.5rem; font-weight: 700; color: ${primary}; }\n  .co { color: #64748b; font-size: .85rem; }\n  .row { display: flex; justify-content: space-between; padding: .4rem 0; }\n  .total { font-size: 1.3rem; font-weight: 700; border-top: 2px solid ${primary}; margin-top: 1rem; padding-top: 1rem; }\n  @media print { body { margin: 0; } }\n</style></head><body>\n  <div class=\"header\">\n    <div><div class=\"title\">${company}</div><div class=\"co\">${addressLine}</div><div class=\"co\">${inv?.phone ?? ''}</div></div>\n    <div style=\"text-align:right\"><div class=\"title\">Invoice</div><div>${inv?.invoice_number ?? ''}</div><div>Issued: ${inv?.issued_date ?? ''}</div><div>Due: ${inv?.due_date ?? ''}</div></div>\n  </div>\n  <p><strong>Project:</strong> ${inv?.project_name ?? ''}</p>\n  <p><strong>Customer:</strong> ${inv?.customer_name ?? ''}</p>\n  <p><strong>Type:</strong> ${inv?.invoice_type ?? ''}</p>\n  <div class=\"row\"><span>Subtotal (net)</span><span>${money(inv?.net_amount)}</span></div>\n  ${Number(inv?.gst_amount) ? `<div class=\"row\"><span>GST</span><span>${money(inv?.gst_amount)}</span></div>` : ''}\n  ${Number(inv?.pst_amount) ? `<div class=\"row\"><span>PST</span><span>${money(inv?.pst_amount)}</span></div>` : ''}\n  <div class=\"row\"><span>Holdback</span><span>${money(inv?.holdback_amount)}</span></div>\n  <div class=\"total\">Total due ${money(inv?.amount_due)}</div>\n</body></html>`;\nreturn [{ json: { ...inv, html } }];"
+    "jsCode": "const inv = $input.first()?.json;\nconst money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\n// stored canonical HTML (previewed == sent) wins when present\nif (inv?.last_client_html) return [{ json: { ...inv, html: inv.last_client_html } }];\nconst company = inv?.company_name ?? 'Ireh Construction';\nconst primary = inv?.brand_primary_color ?? '#1a3a5c';\nconst addressLine = [inv?.street_address, inv?.city, `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`].filter(Boolean).join(', ');\n// legacy fallback render (invoices previewed before stored HTML existed)\nconst html = `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 2rem; }\n  .header { display: flex; justify-content: space-between; border-bottom: 2px solid ${primary}; padding-bottom: 1rem; }\n  .title { font-size: 1.5rem; font-weight: 700; color: ${primary}; }\n  .co { color: #64748b; font-size: .85rem; }\n  .row { display: flex; justify-content: space-between; padding: .4rem 0; }\n  .total { font-size: 1.3rem; font-weight: 700; border-top: 2px solid ${primary}; margin-top: 1rem; padding-top: 1rem; }\n  @media print { body { margin: 0; } }\n</style></head><body>\n  <div class=\"header\">\n    <div><div class=\"title\">${company}</div><div class=\"co\">${addressLine}</div><div class=\"co\">${inv?.phone ?? ''}</div></div>\n    <div style=\"text-align:right\"><div class=\"title\">Invoice</div><div>${inv?.invoice_number ?? ''}</div><div>Issued: ${inv?.issued_date ?? ''}</div><div>Due: ${inv?.due_date ?? ''}</div></div>\n  </div>\n  <p><strong>Project:</strong> ${inv?.project_name ?? ''}</p>\n  <p><strong>Customer:</strong> ${inv?.customer_name ?? ''}</p>\n  <p><strong>Type:</strong> ${inv?.invoice_type ?? ''}</p>\n  ${inv?.description ? `<p><strong>Description:</strong> ${inv.description}</p>` : ''}\n  <div class=\"row\"><span>Subtotal (net)</span><span>${money(inv?.net_amount)}</span></div>\n  ${Number(inv?.gst_amount) ? `<div class=\"row\"><span>GST</span><span>${money(inv?.gst_amount)}</span></div>` : ''}\n  ${Number(inv?.pst_amount) ? `<div class=\"row\"><span>PST</span><span>${money(inv?.pst_amount)}</span></div>` : ''}\n  ${Number(inv?.holdback_amount) ? `<div class=\"row\"><span>Holdback (10% retained)</span><span>${money(inv?.holdback_amount)}</span></div>` : ''}\n  <div class=\"total\">Total due ${money(inv?.amount_due)}</div>\n</body></html>`;\nreturn [{ json: { ...inv, html } }];"
    },
    "id": "inv-06",
    "name": "Render Client Invoice",
@@ -162,9 +162,9 @@
   {
    "parameters": {
     "operation": "executeQuery",
-    "query": "UPDATE invoices SET email_sent_at = CURRENT_TIMESTAMP WHERE (id::text = $1 OR invoice_number = $1) AND email_sent_at IS NULL RETURNING invoice_number;",
+    "query": "UPDATE invoices SET email_sent_at = CURRENT_TIMESTAMP,\n       status = CASE WHEN status = 'DRAFT' THEN 'UNPAID' ELSE status END\n WHERE company_id = $2 AND (id::text = $1 OR invoice_number = $1) AND email_sent_at IS NULL\n RETURNING invoice_number;",
     "options": {
-     "queryReplacement": "={{ [$('Lookup Invoice').first().json.invoice_number] }}"
+     "queryReplacement": "={{ [$('Lookup Invoice').first().json.invoice_number, $('Lookup Invoice').first().json.company_id] }}"
     }
    },
    "id": "inv-08",
@@ -184,7 +184,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const marked = $input.first()?.json;\nconst row = $('Lookup Invoice').first().json;\nconst sent = !!(marked && marked.invoice_number);\nconst when = row?.email_sent_at ? ' on ' + String(row.email_sent_at).slice(0, 10) : '';\nconst html = sent\n  ? `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#16a34a\">Invoice sent</h1><p>Invoice <strong>${row?.invoice_number ?? ''}</strong> was emailed to <strong>${row?.email ?? ''}</strong>.</p><p>You can close this page.</p></body></html>`\n  : `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#d97706\">Already sent</h1><p>Invoice <strong>${row?.invoice_number ?? ''}</strong> was already emailed to <strong>${row?.email ?? ''}</strong>${when}.</p></body></html>`;\nreturn [{ json: { html } }];"
+    "jsCode": "const row = $('Lookup Invoice').first().json;\nconst num = row?.invoice_number ?? '';\nconst email = row?.email ?? '';\nconst resent = row?.email_sent_at ? ' (resent)' : '';\nconst html = `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#16a34a\">Invoice sent${resent}</h1><p>Invoice <strong>${num}</strong> was emailed to <strong>${email}</strong>.</p><p>You can close this page.</p></body></html>`;\nreturn [{ json: { html } }];"
    },
    "id": "inv-09",
    "name": "Build Sent Page",
@@ -222,7 +222,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const row = $input.first()?.json;\nconst when = row?.email_sent_at ? ' on ' + String(row.email_sent_at).slice(0, 10) : '';\nconst html = `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#d97706\">Already sent</h1><p>Invoice <strong>${row?.invoice_number ?? ''}</strong> was already emailed to <strong>${row?.email ?? ''}</strong>${when}.</p><p>You can close this page.</p></body></html>`;\nreturn [{ json: { html } }];"
+    "jsCode": "const q = ($('approve-invoice').first().json || {}).query || {};\nconst row = $input.first()?.json || {};\nconst when = row?.email_sent_at ? ' on ' + String(row.email_sent_at).slice(0, 10) : '';\nconst base = row?.portal_base_url || 'https://n8n2.ordrnow.com';\nconst params = new URLSearchParams();\n['invoice', 'company', 'exp', 'action', 'sig'].forEach((k) => { if (q[k]) params.set(k, String(q[k])); });\nparams.set('resend', '1');\nconst resendUrl = `${base}/webhook/approve-invoice?${params.toString()}`;\nconst html = `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#d97706\">Already sent</h1><p>Invoice <strong>${row?.invoice_number ?? ''}</strong> was already emailed to <strong>${row?.email ?? ''}</strong>${when}.</p><p>If the client did not receive it, you can send it again:</p><p><a href=\"${resendUrl}\" style=\"display:inline-block;background:#16a34a;color:#fff;padding:.6rem 1.2rem;border-radius:6px;text-decoration:none\">Send this invoice again</a></p></body></html>`;\nreturn [{ json: { html } }];"
    },
    "id": "inv-19",
    "name": "Build Already-Sent Page",
@@ -302,7 +302,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const crypto = require('crypto');\nconst data = ($input.first().json || {}).query || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst invoice = String(data.invoice || '').trim();\nconst sig = String(data.sig || '').trim();\nconst expected = crypto.createHmac('sha256', secret).update(invoice).digest('base64url');\nconst ok = invoice.length > 0 && sig === expected;\nreturn [{ json: { ok, invoice, decision: ok ? 'REJECT' : '' } }];"
+    "jsCode": "const crypto = require('crypto');\nconst data = ($input.first().json || {}).query || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst invoice = String(data.invoice || '').trim();\nconst company = String(data.company ?? '1').trim();\nconst action = String(data.action ?? '').trim();\nconst exp = String(data.exp ?? '').trim();\nconst sig = String(data.sig || '').trim();\nlet ok = false, mode = 'invalid';\nif (action === 'reject' && exp) {\n  const expected = crypto.createHmac('sha256', secret).update(`${company}.${invoice}.reject.${exp}`).digest('base64url');\n  ok = sig === expected && Math.floor(Date.now() / 1000) <= Number(exp);\n  if (ok) mode = 'v2';\n}\nreturn [{ json: { ok, invoice, company: company || '1', mode, decision: ok ? 'REJECT' : '' } }];"
    },
    "id": "inv-14",
    "name": "Verify Signature (Reject)",
@@ -348,7 +348,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const v = $input.first()?.json;\nconst invoice = String(v?.invoice ?? '');\nconst html = `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#dc2626\">Invoice not sent</h1><p>Invoice <strong>${invoice}</strong> was <strong>not</strong> emailed to the client \u2014 you rejected the preview.</p><p>You can close this page.</p></body></html>`;\nreturn [{ json: { html } }];"
+    "jsCode": "const v = $('Verify Signature (Reject)').first()?.json;\nconst invoice = String(v?.invoice ?? '');\nconst html = `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#dc2626\">Invoice not sent</h1><p>Invoice <strong>${invoice}</strong> was <strong>not</strong> emailed to the client \\u2014 you rejected the preview.</p><p>You can close this page.</p></body></html>`;\nreturn [{ json: { html } }];"
    },
    "id": "inv-16",
    "name": "Render Rejected Page",
@@ -383,6 +383,116 @@
     1140,
     500
    ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "invoice-found?",
+       "leftValue": "={{ $json.invoice_number }}",
+       "rightValue": "",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty"
+       }
+      }
+     ],
+     "combinator": "and"
+    }
+   },
+   "id": "inv-20",
+   "name": "Invoice Found?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    1140,
+    -200
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "resend-requested?",
+       "leftValue": "={{ String($('Verify Signature (Approve)').first().json.resend) }}",
+       "rightValue": "true",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    }
+   },
+   "id": "inv-21",
+   "name": "Resend Requested?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    1340,
+    -200
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "INSERT INTO invoice_email_log (invoice_id, company_id, kind, recipient, message_id)\nSELECT i.id, i.company_id, $3, $4, $5 FROM invoices i\nWHERE i.company_id = $2 AND (i.id::text = $1 OR i.invoice_number = $1)\nRETURNING id;",
+    "options": {
+     "queryReplacement": "={{ [$('Lookup Invoice').first().json.invoice_number, $('Lookup Invoice').first().json.company_id, $('Lookup Invoice').first().json.email_sent_at ? 'resend' : 'client', $('Lookup Invoice').first().json.email, $('Send Invoice to Client').first().json.id] }}"
+    }
+   },
+   "id": "inv-22",
+   "name": "Exec: Log Client Send",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    1960,
+    200
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "INSERT INTO invoice_email_log (invoice_id, company_id, kind)\nSELECT i.id, i.company_id, 'reject' FROM invoices i\nWHERE i.company_id = $1 AND (i.id::text = $2 OR i.invoice_number = $2)\nRETURNING id;",
+    "options": {
+     "queryReplacement": "={{ [$json.company, $json.invoice] }}"
+    }
+   },
+   "id": "inv-23",
+   "name": "Exec: Log Reject",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    920,
+    700
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
   }
  ],
  "connections": {
@@ -430,7 +540,25 @@
    "main": [
     [
      {
+      "node": "Invoice Found?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Invoice Found?": {
+   "main": [
+    [
+     {
       "node": "Already Sent?",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Respond Page (Invalid)",
       "type": "main",
       "index": 0
      }
@@ -441,7 +569,7 @@
    "main": [
     [
      {
-      "node": "Build Already-Sent Page",
+      "node": "Resend Requested?",
       "type": "main",
       "index": 0
      }
@@ -449,6 +577,24 @@
     [
      {
       "node": "Render Client Invoice",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Resend Requested?": {
+   "main": [
+    [
+     {
+      "node": "Render Client Invoice",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Build Already-Sent Page",
       "type": "main",
       "index": 0
      }
@@ -478,6 +624,17 @@
    ]
   },
   "Mark Invoice Sent": {
+   "main": [
+    [
+     {
+      "node": "Exec: Log Client Send",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: Log Client Send": {
    "main": [
     [
      {
@@ -536,7 +693,7 @@
    "main": [
     [
      {
-      "node": "Render Rejected Page",
+      "node": "Exec: Log Reject",
       "type": "main",
       "index": 0
      }
@@ -544,6 +701,17 @@
     [
      {
       "node": "Respond Page (Invalid)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: Log Reject": {
+   "main": [
+    [
+     {
+      "node": "Render Rejected Page",
       "type": "main",
       "index": 0
      }

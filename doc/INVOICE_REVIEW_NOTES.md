@@ -140,3 +140,102 @@ Signature scheme (stateless, no new columns/env):
 2. With an email on file -> assistant says a preview was emailed to you.
 3. In your inbox: PREVIEW email with Approve/Reject -> tap Approve -> client gets
    the real invoice; tapping again shows "Already sent".
+
+---
+
+# 2026-09-05 build — lifecycle, numbering, resend, audit (decisions D14–D24)
+
+Follow-up build fixing the ten issues found in the invoice-flow review
+(2026-09-04). Built autonomously under the user's overnight grant, plan approved
+in advance. Migrations 0021 (schema) + 0022 (self-rolling-back verify) applied
+live; voice-gateway + approve-invoice workflows redeployed (both active);
+Vapi assistant re-synced (24 tools, contracts updated, read-back verified).
+Pre-apply backup: /home/ubuntu/backups/pm/pre-invoice-fixes-20260905-084813.sql.
+
+## What changed (map to the reviewed issues)
+- **#1 Status lifecycle**: nothing ever moved invoices out of DRAFT. Now the
+  approve-time send flips DRAFT -> UNPAID (Mark Invoice Sent UPDATE); 0021
+  backfilled already-emailed DRAFT rows to UNPAID. OVERDUE/PAID still recompute
+  on payment; a periodic pass (`fn_refresh_invoice_statuses()`, migration 0021)
+  exists and gets wired to the Deadline Reminder schedule later.
+- **#2 Resend**: an already-sent invoice now shows an "Already sent on <date> —
+  Send this invoice again" page (2-tap confirm, no silent resend). Fixing the
+  customer email via update_customer_email then resending now works.
+- **#3 Numbering**: per-company sequence. `company_profile.invoice_last_number`
+  counter + `invoice_prefix` + LPAD(4) -> INV-0001, INV-0002... allocated
+  atomically in the create CTE (UPDATE ... RETURNING inside the INSERT). Legacy
+  epoch-ms numbers grandfathered; counter starts at 0 (first real invoice is
+  INV-0001 — verified: two allocations in the live test produced 0001, 0002).
+- **#4 Content honesty**: create_invoice tool description rewritten (billing = %
+  of revised contract value, tax from company rates); removed the fake
+  `include_change_order_ids` param; invoice_type enum now the canonical stored
+  values (DEPOSIT/PROGRESS_BILLING/CHANGE_ORDER/FINAL); added optional
+  `description` shown on the invoice; billing_percentage defaults to 100 (so
+  FINAL works without it). Real line-item itemization stays a future build.
+- **#5 Holdback**: automatic — net_amount x company retention_rate (10%) on
+  Deposit/Progress/Change Order invoices, 0 on FINAL; shown on the invoice and
+  counted by the rollup's retention_held. Live-verified (2625.00 on a 50% draw).
+- **#6 Delivery visibility**: every outbound email (preview, client, resend)
+  and every reject is logged to `invoice_email_log` with recipient + Gmail
+  message_id. True bounce/read tracking still needs Gmail watch/PubSub — future.
+- **#7 Single template**: the client HTML is rendered ONCE at preview time and
+  stored in `invoices.last_client_html`; approve emails that stored copy (legacy
+  rows fall back to an inline re-render). Previewed == sent, template edited in
+  one place (the gateway Render Invoice HTML node).
+- **#8 Audit + expiry**: new sig scheme `HMAC(secret, company.invoice.action.exp)`
+  with 90-day expiry and approve/reject action binding. Legacy approve links
+  (HMAC over number only) still verify; legacy reject links are now invalid
+  (they were indistinguishable from approve and only cancelled sends — benign).
+  Rejects are logged (audit) — previously nothing was recorded.
+- **#9 Cross-tenant (Step 3-proof)**: the signed payload carries company_id; the
+  approve/reject lookups filter `WHERE company_id = <signed>`, so a link minted
+  for one company cannot act on another company's same-numbered invoice.
+- **#10**: invoice lookups resolve the company via the project
+  (`JOIN company_profile cp ON cp.id = p.company_id`) instead of hardcoded id=1;
+  create_invoice is likewise project-driven, so per-company numbering works for
+  every company the moment Step 3 lands.
+
+## Decisions made this build (D14–D24)
+- D14: numbering counter on company_profile (INT, transactional) rather than a
+  Postgres sequence — one counter per company row, rolls back with its tx.
+- D15: holdback auto-applied at company retention_rate unless invoice_type=FINAL.
+- D16: invoice is ISSUED (UNPAID) at first client send, not at creation; DRAFT
+  rows are never sent-able twice (email_sent_at still gates the first send).
+- D17: stored-HTML (last_client_html) is authoritative for the client email;
+  gateway is the single template owner.
+- D18: resend is a deliberate second tap on the Already-sent page (resend=1
+  param); resends are logged kind=resend and never change status/email_sent_at.
+- D19: invoice_email_log rows: preview (recipient = PM inbox), client/resend
+  (recipient = client, message_id from the Gmail node output), reject
+  (no recipient). FK invoice_id ON DELETE CASCADE.
+- D20: signature v2 = base64url HMAC over `company.invoice.action.exp`; legacy
+  approve accepted with no expiry; legacy reject rejected. Old previews' Reject
+  buttons stop working (harmless); their Approve buttons still work.
+- D21: email format validation on update_customer_email (SQL regex) with
+  outcome OK / INVALID_EMAIL / NOT_FOUND — a bad address is refused, not saved.
+- D22: create_invoice queryReplacement defaults billing_percentage to 100 so a
+  Final invoice never breaks on a missing percentage.
+- D23: gate node added in approve flow (Invoice Found?) — a valid-sig link for a
+  deleted invoice shows the invalid page instead of erroring the webhook.
+- D24: holdback line on the invoice HTML only renders when > 0 (no "$0.00
+  Holdback" noise); description renders when present.
+
+## Still open (explicitly out of scope this build)
+- Bounce/read tracking (needs Gmail watch API / Pub/Sub) — log has message_id
+  ready for it.
+- Real line-item itemization (invoice_line_items) and PDF attachments (D3).
+- fn_refresh_invoice_statuses is not yet scheduled — wire it with the Deadline
+  Reminder workflow so stored OVERDUE ages without a payment event.
+
+## Manual QA for the PM (next interaction)
+1. Voice: "create a progress invoice for Oakridge at 50%" -> expect INV-0001,
+   amount incl. GST, holdback line mentioned.
+2. "send invoice INV-0001" -> preview email in support.ordrnow@gmail.com with
+   Approve + Reject; approve -> client email (noreply@example.com if fixture)
+   -> page "Invoice sent"; DB: status UNPAID, email_sent_at set, log row kind
+   client.
+3. Tap the same Approve link again -> "Already sent — Send this invoice again"
+   -> tap -> resent (log kind resend).
+4. Change the client email (wrong address) then resend -> works.
+5. list_invoices / "who owes me money" now surfaces sent invoices as UNPAID/
+   OVERDUE instead of hiding them as DRAFT.

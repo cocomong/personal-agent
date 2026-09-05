@@ -1,11 +1,13 @@
 # Database Schema — live (generated)
 
-> **Generated 2026-09-04 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0019 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
+> **Generated 2026-09-05 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0021 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
 
 ## Conventions
 - Every business table PK is `id UUID DEFAULT uuid_generate_v4()` (uuid-ossp).
 - Write tools carry a `tool_call_id` UNIQUE column (ADR-3): replayed Vapi tool calls `ON CONFLICT (tool_call_id) DO NOTHING` instead of double-inserting.
 - `company_id SMALLINT NOT NULL DEFAULT 1 REFERENCES company_profile(id)` on every directly-scoped table (Step 2, migration 0019). `DEFAULT 1` = the original Ireh row; Step 3 (scoped gateway) drops the default and writes company_id explicitly. `company_profile.id` is a sequence (`company_profile_id_seq`, starts at 2) — one profile per company.
+- Invoice numbers are per-company sequential: `invoice_prefix + LPAD(invoice_last_number, 4)` (migration 0021), e.g. INV-0001. Legacy timestamp numbers are grandfathered.
+- Outbound invoice emails (preview / client / resend / reject) are audited in `invoice_email_log` (0021). `invoices.email_sent_at` = first client send; `last_client_html` = the canonical client HTML stored at preview time (approve emails that copy, so previewed == sent).
 - Children that inherit tenancy via a parent's `project_id` (estimates, change_orders, timesheets, invoice_line_items, payments, payroll_entries) carry no company_id column.
 - Worker identity: `workers.id` (uuid) is the FK target; `worker_code` (W-###) is a per-company unique display/code handle — two companies may each have a W-001.
 
@@ -52,9 +54,10 @@
 | `pm_preferred_name` | `character varying(255)` | How the PM wants to be addressed daily (e.g. Dave, boss) |
 | `setup_completed_at` | `timestamp with time zone` | NULL until onboarding completes; set once, preserved on re-runs |
 | `created_by_user` | `uuid` |  |
+| `invoice_last_number` | `integer` | NOT NULL, default 0 |
 - FK: `created_by_user` → `users(id)` (ON DELETE NO ACTION)
 
-*created in 0007_company_profile; extended in 0014_schedule, 0016_onboarding, 0019_tenant_columns*
+*created in 0007_company_profile; extended in 0014_schedule, 0016_onboarding, 0019_tenant_columns, 0021_invoice_fixes*
 
 ### users
 
@@ -144,13 +147,15 @@
 | `pst_applicable` | `boolean` | NOT NULL, default false |
 | `email_sent_at` | `timestamp with time zone` |  |
 | `company_id` | `smallint` | NOT NULL, default 1, tenant |
+| `description` | `text` |  |
+| `last_client_html` | `text` | Canonical client HTML stored at preview time; approve workflow emails this copy |
 - FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
 - FK: `project_id` → `projects(id)` (ON DELETE CASCADE)
 - index `idx_invoices_company`
 - index `idx_invoices_project`
 - UNIQUE index `uq_invoices_company_invoice_number` (per-company unique; Step 2)
 
-*created in 0001_init; extended in 0009_tax_payments, 0018_invoice_send, 0019_tenant_columns*
+*created in 0001_init; extended in 0009_tax_payments, 0018_invoice_send, 0019_tenant_columns, 0021_invoice_fixes*
 
 ### invoice_line_items
 
@@ -185,6 +190,24 @@
 - index `idx_payments_invoice`
 
 *created in 0009_tax_payments*
+
+### invoice_email_log
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
+| `invoice_id` | `uuid` | NOT NULL |
+| `company_id` | `smallint` | NOT NULL, default 1, tenant |
+| `kind` | `character varying(20)` | NOT NULL |
+| `recipient` | `character varying(255)` |  |
+| `message_id` | `character varying(255)` |  |
+| `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
+- FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
+- FK: `invoice_id` → `invoices(id)` (ON DELETE CASCADE)
+- index `idx_invoice_email_log_company`
+- index `idx_invoice_email_log_invoice`
+
+*created in 0021_invoice_fixes*
 
 ## Quotes & change orders
 
@@ -589,6 +612,7 @@ UNION ALL
 
 ## Functions
 
+- `fn_refresh_invoice_statuses()` → `integer`  (created in 0021_invoice_fixes)
 - `fn_run_payroll(p_end date, p_days integer)` → `TABLE(run_id uuid, period_start date, period_end date, status character varying, workers bigint, regular_hours numeric, overtime_hours numeric, gross_pay numeric, deductions numeric, net_pay numeric)`  (created in 0008_workers_payroll)
 - `recompute_invoice_status(invoice_uuid uuid)` → `void`  (created in 0009_tax_payments)
 - `uuid_generate_v1()` → `uuid`  (created in ?)
@@ -605,6 +629,8 @@ UNION ALL
 ## Sequences
 
 - `company_profile_id_seq`
+
+## Un-grouped tables: invoice_email_log
 
 ## Appendix — how to regenerate
 

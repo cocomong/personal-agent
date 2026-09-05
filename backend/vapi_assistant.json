@@ -232,7 +232,7 @@
    "type": "function",
    "function": {
     "name": "create_invoice",
-    "description": "Generates a draft invoice pulling from progress on the base estimate or approved change orders.",
+    "description": "Creates a DRAFT invoice for a project, billed as a percentage of the project's current revised contract value. Amount = revised contract value x billing_percentage% (default 100), plus GST, and PST only when pst_applicable. Holdback at the company retention rate (10%) is retained automatically on Deposit / Progress / Change Order invoices, not on Final. The invoice number is assigned automatically per company (e.g. INV-0001) - do not invent one. A short work description is optional. The invoice is NOT sent to the client here: call send_customer_invoice afterwards, which emails a preview to the PM for approval.",
     "parameters": {
      "type": "object",
      "properties": {
@@ -242,27 +242,25 @@
       },
       "invoice_type": {
        "type": "string",
+       "description": "Canonical invoice type. PROGRESS_BILLING = progress draw on the contract, CHANGE_ORDER = bill for an approved change, DEPOSIT = deposit invoice, FINAL = final invoice (no holdback).",
        "enum": [
-        "Deposit",
-        "Progress",
-        "Change Order",
-        "Final"
+        "DEPOSIT",
+        "PROGRESS_BILLING",
+        "CHANGE_ORDER",
+        "FINAL"
        ]
-      },
-      "include_change_order_ids": {
-       "type": "array",
-       "items": {
-        "type": "string"
-       },
-       "description": "Array of Change Order UUIDs to include as separate line items"
       },
       "billing_percentage": {
        "type": "number",
-       "description": "Percentage of base contract to bill (e.g. 25 for 25% progress)"
+       "description": "Percentage of the revised contract value to bill (e.g. 25 = 25%). Defaults to 100 for Final invoices."
       },
       "pst_applicable": {
        "type": "boolean",
        "description": "Apply PST (7%) in addition to GST; default false"
+      },
+      "description": {
+       "type": "string",
+       "description": "Optional one-line description of the work being billed (shown on the invoice)"
       }
      },
      "required": [
@@ -280,7 +278,7 @@
    "type": "function",
    "function": {
     "name": "send_customer_invoice",
-    "description": "Emails a PREVIEW of the invoice to the PM's own inbox with Approve/Reject links; the invoice is emailed to the client ONLY after the PM approves the preview. If the client has no email on file, ask the user for the client's email address, call update_customer_email, then retry.",
+    "description": "Emails a PREVIEW of the invoice to the PM's own inbox with Approve / Send-again links; the invoice is emailed to the client ONLY after the PM approves the preview. If the client has no email on file, ask the user for the client's email address, call update_customer_email, then retry. If the invoice was already sent (e.g. the client never received it), tell the PM: approving again will RESEND it to the client.",
     "parameters": {
      "type": "object",
      "properties": {
@@ -290,7 +288,7 @@
       },
       "invoice_id": {
        "type": "string",
-       "description": "Specific invoice number to send (e.g. INV-1002)"
+       "description": "Invoice id or number to preview/send (numbers look like INV-0001)"
       }
      },
      "required": [
@@ -737,7 +735,7 @@
    "type": "function",
    "function": {
     "name": "update_customer_email",
-    "description": "Sets or corrects the email address on file for an existing customer. Use when a customer has no email on file (e.g. before sending an invoice or approval email) or to change an outdated address.",
+    "description": "Sets or fixes the email address on a customer record. Validates the format - if it looks invalid it returns an error and nothing is saved. When a send flow reported a missing client email, call this with the address the PM provides, then retry the send.",
     "parameters": {
      "type": "object",
      "properties": {

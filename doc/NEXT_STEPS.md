@@ -1,3 +1,15 @@
+# NEXT STEPS — status 2026-09-05 (invoice lifecycle build done)
+
+## DONE 2026-09-05 — invoice generation/regen overhaul (overnight build, plan approved)
+Full fix of the ten reviewed invoice issues (status lifecycle, resend, per-company
+numbering INV-0001+, honest billing contract, auto-holdback, email audit log, single
+stored template, expiring action-bound signatures, company-scoped approve links).
+db/0021 + 0022 live; voice-gateway + approve-invoice redeployed; Vapi synced (24 tools).
+Details + decisions D14-D24: doc/INVOICE_REVIEW_NOTES.md (bottom section).
+Manual QA checklist for the PM is at the end of that section.
+Remaining from that build (out of scope, tracked): bounce/read tracking (Gmail watch),
+real line items, scheduled fn_refresh_invoice_statuses (wire with Deadline Reminder).
+
 # NEXT STEPS — status 2026-09-04 (Step 2 tenant columns done)
 
 ## DONE since the header below was written
