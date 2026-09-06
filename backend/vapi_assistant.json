@@ -328,7 +328,7 @@
       "type": "function",
       "function": {
         "name": "get_estimate_approval_link",
-        "description": "Returns a customer-facing approval page link to sign the baseline estimate (contract).",
+        "description": "Pushes the customer-facing baseline-estimate (contract) approval page to the PM's phone as a tappable notification (type: link sent to phone). Use when the PM wants to send the estimate approval link to their own phone. Args: project_id = project id or name. If no device is registered the link is read out instead.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -351,7 +351,7 @@
       "type": "function",
       "function": {
         "name": "get_change_order_approval_link",
-        "description": "Returns a customer-facing approval page link to sign a change order (amendment).",
+        "description": "Pushes the customer-facing change-order approval page to the PM's phone as a tappable notification (type: link sent to phone). Use when the PM wants to send the change-order approval link to their own phone. Args: project_id = project id or name; change_order_number e.g. CO-002. If no device is registered the link is read out instead.",
         "parameters": {
           "type": "object",
           "properties": {

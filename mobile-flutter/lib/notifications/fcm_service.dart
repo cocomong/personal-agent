@@ -101,12 +101,26 @@ class FcmService {
         time is String &&
         time.isNotEmpty) {
       await NotificationService.instance.scheduleDaily(time);
+      return;
+    }
+    final url = data['url'];
+    if (data['type'] == 'open_url' && url is String && url.isNotEmpty) {
+      await NotificationService.instance.showLink(
+        title: (data['title'] as String?)?.isNotEmpty == true
+            ? data['title'] as String
+            : 'Action needed',
+        body: (data['body'] as String?)?.isNotEmpty == true
+            ? data['body'] as String
+            : 'Tap to open the link',
+        url: url,
+      );
     }
   }
 }
 
 /// Top-level background handler (isolated VM entry point) for the data message
-/// when the app is terminated. Re-schedules the local notification directly.
+/// when the app is terminated. Re-schedules the local notification, or shows a
+/// link notification for `open_url` pushes, directly.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final data = message.data;
@@ -116,5 +130,19 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       time.isNotEmpty) {
     await NotificationService.instance.init();
     await NotificationService.instance.scheduleDaily(time);
+    return;
+  }
+  final url = data['url'];
+  if (data['type'] == 'open_url' && url is String && url.isNotEmpty) {
+    await NotificationService.instance.init();
+    await NotificationService.instance.showLink(
+      title: (data['title'] as String?)?.isNotEmpty == true
+          ? data['title'] as String
+          : 'Action needed',
+      body: (data['body'] as String?)?.isNotEmpty == true
+          ? data['body'] as String
+          : 'Tap to open the link',
+      url: url,
+    );
   }
 }

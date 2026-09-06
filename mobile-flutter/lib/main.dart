@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'agent_screen.dart';
 import 'auth/auth_service.dart';
@@ -19,8 +20,22 @@ Future<void> main() async {
   unawaited(_bootstrap());
 }
 
+/// Opens assistant-sent links (approval pages, etc.) in the system browser.
+/// v1 uses the external browser on purpose — no in-app WebView yet.
+Future<void> _openLinkPayload(String? payload) async {
+  if (payload == null || payload.isEmpty) return;
+  final uri = Uri.tryParse(payload);
+  if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https')) return;
+  try {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } catch (e) {
+    debugPrint('launchUrl failed: $e');
+  }
+}
+
 Future<void> _bootstrap() async {
   try {
+    NotificationService.instance.onNotificationTap = _openLinkPayload;
     await NotificationService.instance.init();
     await FcmService.instance.init();
   } catch (e) {

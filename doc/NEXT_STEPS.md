@@ -17,6 +17,19 @@ is finished and working. When that trigger fires, plan + build in order:
 Guidance recorded: registrar Porkbun/Cloudflare; site = www.<domain>,
 proxy = portal.<domain>; n8n2.ordrnow.com stays internal/admin.
 
+# NEXT STEPS — status 2026-09-06 (push-to-phone links done)
+
+## DONE 2026-09-06 — approval links delivered via push notification (see doc/PUSH_LINKS.md)
+get_estimate_approval_link + get_change_order_approval_link now PUSH the link to
+registered phones as an FCM 'open_url' data message; voice replies "…sent to your
+phone — tap the notification to open it" (speaks the URL only when no device is
+registered). App: notification tap opens the link in the system browser
+(url_launcher) from foreground/background/terminated states. New APK built.
+Follow-ups: (a) user device QA of the tap flow (manual list in PUSH_LINKS.md);
+(b) stale NotRegistered device-token cleanup on re-registration; (c) chat-text
+rendering gap (typed assistant replies) still open; (d) real "open in app"
+portal pages later — same push type + tap handler is the pattern.
+
 # NEXT STEPS — status 2026-09-06 (simple billing model done)
 
 ## DONE 2026-09-06 — billing model: progress % of ORIGINAL contract + COs billed at 100%

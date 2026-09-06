@@ -17,6 +17,7 @@ dependencies:
   google_sign_in: ^6.3.0
   http: ^1.6.0
   timezone: ^0.11.1
+  url_launcher: ^6.3.0
   vapi: ^0.1.0
 
 dev_dependencies:
