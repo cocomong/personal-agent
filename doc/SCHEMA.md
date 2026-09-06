@@ -1,6 +1,6 @@
 # Database Schema — live (generated)
 
-> **Generated 2026-09-05 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0023 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
+> **Generated 2026-09-05 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0025 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
 
 ## Conventions
 - Every business table PK is `id UUID DEFAULT uuid_generate_v4()` (uuid-ossp).
@@ -178,6 +178,7 @@
 | `amount` | `numeric(12,2)` | NOT NULL |
 - FK: `invoice_id` → `invoices(id)` (ON DELETE CASCADE)
 - index `idx_invoice_line_items_invoice`
+- UNIQUE index `uq_invoice_line_items_source` (per-company unique; Step 2)
 
 *created in 0001_init*
 

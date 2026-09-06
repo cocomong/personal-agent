@@ -45,6 +45,7 @@ MIGRATIONS=(
   0019_tenant_columns.sql
   0021_invoice_fixes.sql
   0023_invoice_presentation.sql
+  0025_billing_change_orders.sql
 )
 
 VERIFY=(
@@ -53,6 +54,7 @@ VERIFY=(
   0020_tenant_verify.sql
   0022_invoice_fixes_verify.sql
   0024_invoice_presentation_verify.sql
+  0026_billing_change_orders_verify.sql
 )
 
 echo "== Migrations =="

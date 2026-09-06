@@ -1,3 +1,12 @@
+# NEXT STEPS — status 2026-09-06 (simple billing model done)
+
+## DONE 2026-09-06 — billing model: progress % of ORIGINAL contract + COs billed at 100%
+create_invoice now draws against projects.original_contract_value with a 100% cumulative
+cap; CHANGE_ORDER invoices auto-bill every approved, not-yet-billed change order at full
+value, itemized (invoice_line_items now used); approve-side duplicate guard; schedule-of-
+values method deliberately deferred (documented in INVOICE_REVIEW_NOTES.md). db/0025+0026
+live; gateway + approve redeployed; Vapi 25 tools. Decisions D31-D34 + QA: INVOICE_REVIEW_NOTES.md.
+
 # NEXT STEPS — status 2026-09-05 (invoice presentation & capture done)
 
 ## DONE 2026-09-05 build 2 — invoice presentation + capture

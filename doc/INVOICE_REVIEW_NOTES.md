@@ -244,6 +244,71 @@ Pre-apply backup: /home/ubuntu/backups/pm/pre-invoice-fixes-20260905-084813.sql.
 
 ---
 
+# 2026-09-06 — simple billing model: progress on ORIGINAL contract + COs at 100% (D31–D34)
+
+User decision (2026-09-06): keep the app simple — schedule-of-values invoicing is
+deferred (see section above). Progress/deposit/final invoices bill a percentage
+of the ORIGINAL contract value; approved change orders are billed at 100% of
+their approved amount when the PM bills them. Built overnight under grant.
+db/0025 (partial unique index on invoice_line_items (invoice_id, source_type,
+source_id)) + 0026 verify live; voice-gateway + approve-invoice redeployed;
+Vapi re-synced (25 tools). Backup: /home/ubuntu/backups/pm/pre-billing-co-*.sql.
+
+## Changes
+- create_invoice PROGRESS_BILLING/DEPOSIT/FINAL: basis = projects.
+  original_contract_value (snapshot into billed_basis); auto line reads
+  "...% of contract value ($X)" when basis equals original, else
+  "revised contract value" (legacy rows). NEW cap: refuses a draw whose
+  billing_percentage would push the project's issued cumulative % (sum of
+  billing_percentage on DEPOSIT/PROGRESS_BILLING/FINAL, non-DRAFT) past 100.
+- create_invoice CHANGE_ORDER: new gateway node bills EVERY approved,
+  not-yet-billed CO at its full approved amount, each written to
+  invoice_line_items ("Change order #N - description"); net = sum of COs;
+  tax + holdback (10%) applied; returns line_count. No unbilled COs -> no
+  invoice, clear spoken message. Billed status is DERIVED: a CO counts as
+  billed when any issued invoice (status <> DRAFT) has a line for it; DRAFT
+  previews never claim a CO.
+- Template (shared builder, gateway Render + approve fallback in sync): CO
+  invoices render each change order as an itemized row + subtotal when >1 line;
+  progress invoices keep the single descriptive row.
+- Approve-side duplicate guard: sending a CHANGE_ORDER invoice runs a check —
+  if any of its COs already appears on another issued invoice, the send is
+  blocked with an "Already billed" page (catches two drafts created before
+  either was sent).
+- Vapi: create_invoice description + prompt rule 3 rewritten for the two modes.
+
+## Decisions D31–D34
+- D31: progress draws always measure the ORIGINAL signed contract value; the
+  revised value matters only at project level (it reconciles = original + all
+  approved COs billed in full).
+- D32: a CHANGE_ORDER invoice auto-includes ALL approved-unbilled COs (no
+  per-CO selection v1 — "bill the outstanding change orders" in one shot).
+- D33: COs are billed at full value when billed (no staged CO draws); negative
+  (credit) COs supported as negative lines.
+- D34: previously created invoices are untouched (legacy basis kept); the new
+  basis applies to invoices created after this build.
+
+## Verified
+- Hermetic: fresh-chain incl. 0025/0026 idempotent.
+- Template: itemized CO invoice (two lines, subtotal, holdback, no % line) and
+  original-basis progress label — asserted.
+- Live SQL (rolled back): 60% draw on $50k original = $30,000 net/$31,500 due/
+  $3,000 holdback with billed_basis $50,000; cap refuses a further 50%; CO
+  invoice bills the $2,500 approved CO (line_count 1, holdback $250); after
+  issuing, a second CO attempt bills nothing. (Blocked attempts consume an
+  invoice number from the per-company counter — harmless gaps only.)
+- Deployed exports carry the new nodes; gateway + approve webhooks 200.
+
+## Manual QA for the PM (next interaction)
+1. "Create a 60% progress invoice for Oakridge" -> INV-00xx based on $50,000
+   original; label says "60% of contract value ($50,000.00)".
+2. "Try another 50%" -> refused (would exceed 100% billed).
+3. "Create a change-order invoice for Oakridge" (has an approved CO) -> line
+   itemized at full value; approve-send works; then repeat -> "no unbilled".
+4. New CO approved then billed: confirm it shows as its own line.
+
+---
+
 # Future option — schedule-of-values invoicing (user sample 2026-09-06, NOT built)
 
 User's real-world draw layout, captured for later: every value line (Original

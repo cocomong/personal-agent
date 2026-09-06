@@ -124,7 +124,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const inv = $input.first()?.json;\nfunction buildClientInvoiceHtml(inv) {\n  const money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\n  const company = inv?.company_name ?? 'Ireh Construction';\n  const primary = inv?.brand_primary_color ?? '#1a3a5c';\n  const accent = inv?.brand_accent_color ?? '#2563eb';\n  const addressLine = [inv?.street_address, inv?.city, `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`].filter(Boolean).join(', ');\n  const typeMap = { 'DEPOSIT': 'Deposit', 'PROGRESS_BILLING': 'Progress billing', 'CHANGE_ORDER': 'Change order',\n                    'FINAL': 'Final', 'Deposit': 'Deposit', 'Progress': 'Progress billing',\n                    'Change Order': 'Change order', 'Final': 'Final' };\n  const typeLabel = typeMap[inv?.invoice_type] || inv?.invoice_type || '';\n  const holdbackPct = inv?.retention_rate != null ? Math.round(Number(inv.retention_rate) * 100) : 10;\n  const taxLines = [];\n  if (inv?.gst_reg_number) taxLines.push(`<div class=\"co\">GST # ${inv.gst_reg_number}</div>`);\n  if (inv?.pst_reg_number) taxLines.push(`<div class=\"co\">PST # ${inv.pst_reg_number}</div>`);\n  const pct = inv?.billing_percentage;\n  const basis = inv?.billed_basis;\n  const lineLabel = inv?.description\n    ? String(inv.description)\n    : (pct != null && basis != null)\n      ? `${typeLabel} \\u2014 ${String(Number(pct))}% of revised contract value (${money(basis)})`\n      : typeLabel || 'Services';\n  const billTo = [inv?.bill_street, inv?.bill_city, inv?.bill_province ? `${inv?.bill_province} ${inv?.bill_postal ?? ''}` : inv?.bill_postal]\n    .map(s => (s || '').toString().trim()).filter(Boolean);\n  const showBillTo = billTo.length > 0;\n  const payLines = (inv?.payment_instructions || '').split('\\n').filter(s => s.trim().length > 0);\n  return `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 2rem; }\n  .header { display: flex; justify-content: space-between; border-bottom: 2px solid ${primary}; padding-bottom: 1rem; }\n  .title { font-size: 1.5rem; font-weight: 700; color: ${primary}; }\n  .co { color: #64748b; font-size: .85rem; }\n  .row { display: flex; justify-content: space-between; padding: .4rem 0; }\n  .total { font-size: 1.3rem; font-weight: 700; border-top: 2px solid ${primary}; margin-top: 1rem; padding-top: 1rem; }\n  .billto { border-left: 3px solid ${accent}; padding-left: .75rem; margin: .75rem 0; color: #334155; }\n  .pay { border-top: 1px solid #cbd5e1; margin-top: 1.5rem; padding-top: .75rem; color: #475569; font-size: .9rem; }\n  @media print { body { margin: 0; } }\n</style></head><body>\n  <div class=\"header\">\n    <div><div class=\"title\">${company}</div><div class=\"co\">${addressLine}</div><div class=\"co\">${inv?.phone ?? ''}</div>${taxLines.join('')}</div>\n    <div style=\"text-align:right\"><div class=\"title\">Invoice</div><div>${inv?.invoice_number ?? ''}</div><div>Issued: ${inv?.issued_date ?? ''}</div><div>Due: ${inv?.due_date ?? ''}</div></div>\n  </div>\n  <p><strong>Project:</strong> ${inv?.project_name ?? ''}</p>\n  <p><strong>Customer:</strong> ${inv?.customer_name ?? ''}${inv?.customer_company ? ` (${inv.customer_company})` : ''}</p>\n  ${showBillTo ? `<div class=\"billto\"><strong>Bill to</strong><br>${billTo.join('<br>')}</div>` : ''}\n  <p><strong>Type:</strong> ${typeLabel || '\\u2014'}</p>\n  <div class=\"row\"><span>${lineLabel}</span><span>${money(inv?.net_amount)}</span></div>\n  ${Number(inv?.gst_amount) ? `<div class=\"row\"><span>GST</span><span>${money(inv?.gst_amount)}</span></div>` : ''}\n  ${Number(inv?.pst_amount) ? `<div class=\"row\"><span>PST</span><span>${money(inv?.pst_amount)}</span></div>` : ''}\n  ${Number(inv?.holdback_amount) ? `<div class=\"row\"><span>Holdback (${holdbackPct}% retained)</span><span>${money(inv?.holdback_amount)}</span></div>` : ''}\n  <div class=\"total\">Total due ${money(inv?.amount_due)}</div>\n  ${payLines.length ? `<div class=\"pay\"><strong>How to pay</strong><br>${payLines.join('<br>')}</div>` : ''}\n</body></html>`; }\n// stored canonical HTML (previewed == sent) wins when present\nif (inv?.last_client_html) return [{ json: { ...inv, html: inv.last_client_html } }];\nreturn [{ json: { ...inv, html: buildClientInvoiceHtml(inv) } }];"
+    "jsCode": "const inv = $input.first()?.json;\nfunction buildClientInvoiceHtml(inv) {\n  const money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\n  const company = inv?.company_name ?? 'Ireh Construction';\n  const primary = inv?.brand_primary_color ?? '#1a3a5c';\n  const accent = inv?.brand_accent_color ?? '#2563eb';\n  const addressLine = [inv?.street_address, inv?.city, `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`].filter(Boolean).join(', ');\n  const typeMap = { 'DEPOSIT': 'Deposit', 'PROGRESS_BILLING': 'Progress billing', 'CHANGE_ORDER': 'Change order',\n                    'FINAL': 'Final', 'Deposit': 'Deposit', 'Progress': 'Progress billing',\n                    'Change Order': 'Change order', 'Final': 'Final' };\n  const typeLabel = typeMap[inv?.invoice_type] || inv?.invoice_type || '';\n  const holdbackPct = inv?.retention_rate != null ? Math.round(Number(inv.retention_rate) * 100) : 10;\n  const taxLines = [];\n  if (inv?.gst_reg_number) taxLines.push(`<div class=\"co\">GST # ${inv.gst_reg_number}</div>`);\n  if (inv?.pst_reg_number) taxLines.push(`<div class=\"co\">PST # ${inv.pst_reg_number}</div>`);\n  const lines = Array.isArray(inv?.lines) ? inv.lines : [];\n  const pct = inv?.billing_percentage;\n  const basis = inv?.billed_basis;\n  const isOriginalBasis = pct != null && basis != null && inv?.contract_original != null &&\n    Math.abs(Number(basis) - Number(inv.contract_original)) < 0.005;\n  const basisLabel = isOriginalBasis ? 'contract value' : 'revised contract value';\n  const lineLabel = inv?.description\n    ? String(inv.description)\n    : (pct != null && basis != null)\n      ? `${typeLabel} \\u2014 ${String(Number(pct))}% of ${basisLabel} (${money(basis)})`\n      : typeLabel || 'Services';\n  const billTo = [inv?.bill_street, inv?.bill_city, inv?.bill_province ? `${inv?.bill_province} ${inv?.bill_postal ?? ''}` : inv?.bill_postal]\n    .map(s => (s || '').toString().trim()).filter(Boolean);\n  const showBillTo = billTo.length > 0;\n  const payLines = (inv?.payment_instructions || '').split('\\n').filter(s => s.trim().length > 0);\n  const itemRows = lines.length\n    ? lines.map(l => `<div class=\"row\"><span>${l.description || ''}</span><span>${money(l.amount)}</span></div>`).join('')\n    : `<div class=\"row\"><span>${lineLabel}</span><span>${money(inv?.net_amount)}</span></div>`;\n  const subTotalRow = lines.length > 1 ? `<div class=\"row\" style=\"border-top:1px solid #e2e8f0;margin-top:.5rem;padding-top:.5rem\"><strong>Subtotal (net)</strong><strong>${money(inv?.net_amount)}</strong></div>` : '';\n  return `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 2rem; }\n  .header { display: flex; justify-content: space-between; border-bottom: 2px solid ${primary}; padding-bottom: 1rem; }\n  .title { font-size: 1.5rem; font-weight: 700; color: ${primary}; }\n  .co { color: #64748b; font-size: .85rem; }\n  .row { display: flex; justify-content: space-between; padding: .4rem 0; }\n  .total { font-size: 1.3rem; font-weight: 700; border-top: 2px solid ${primary}; margin-top: 1rem; padding-top: 1rem; }\n  .billto { border-left: 3px solid ${accent}; padding-left: .75rem; margin: .75rem 0; color: #334155; }\n  .pay { border-top: 1px solid #cbd5e1; margin-top: 1.5rem; padding-top: .75rem; color: #475569; font-size: .9rem; }\n  @media print { body { margin: 0; } }\n</style></head><body>\n  <div class=\"header\">\n    <div><div class=\"title\">${company}</div><div class=\"co\">${addressLine}</div><div class=\"co\">${inv?.phone ?? ''}</div>${taxLines.join('')}</div>\n    <div style=\"text-align:right\"><div class=\"title\">Invoice</div><div>${inv?.invoice_number ?? ''}</div><div>Issued: ${inv?.issued_date ?? ''}</div><div>Due: ${inv?.due_date ?? ''}</div></div>\n  </div>\n  <p><strong>Project:</strong> ${inv?.project_name ?? ''}</p>\n  <p><strong>Customer:</strong> ${inv?.customer_name ?? ''}${inv?.customer_company ? ` (${inv.customer_company})` : ''}</p>\n  ${showBillTo ? `<div class=\"billto\"><strong>Bill to</strong><br>${billTo.join('<br>')}</div>` : ''}\n  <p><strong>Type:</strong> ${typeLabel || '\\u2014'}</p>\n  ${itemRows}\n  ${subTotalRow}\n  ${Number(inv?.gst_amount) ? `<div class=\"row\"><span>GST</span><span>${money(inv?.gst_amount)}</span></div>` : ''}\n  ${Number(inv?.pst_amount) ? `<div class=\"row\"><span>PST</span><span>${money(inv?.pst_amount)}</span></div>` : ''}\n  ${Number(inv?.holdback_amount) ? `<div class=\"row\"><span>Holdback (${holdbackPct}% retained)</span><span>${money(inv?.holdback_amount)}</span></div>` : ''}\n  <div class=\"total\">Total due ${money(inv?.amount_due)}</div>\n  ${payLines.length ? `<div class=\"pay\"><strong>How to pay</strong><br>${payLines.join('<br>')}</div>` : ''}\n</body></html>`; }\nif (inv?.last_client_html) return [{ json: { ...inv, html: inv.last_client_html } }];\nreturn [{ json: { ...inv, html: buildClientInvoiceHtml(inv) } }];"
    },
    "id": "inv-06",
    "name": "Render Client Invoice",
@@ -493,6 +493,131 @@
      "name": "Supabase PostgreSQL"
     }
    }
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "is-co-invoice?",
+       "leftValue": "={{ $json.invoice_type }}",
+       "rightValue": "CHANGE_ORDER",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    }
+   },
+   "id": "inv-30",
+   "name": "Is CO Invoice?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    1500,
+    -100
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT EXISTS (\n  SELECT 1 FROM invoice_line_items li\n  JOIN invoices o ON o.id = li.invoice_id\n  WHERE li.source_type = 'change_order'\n    AND li.source_id IN (SELECT source_id FROM invoice_line_items WHERE invoice_id = $1)\n    AND o.id <> $1 AND o.status <> 'DRAFT'\n) AS dup;",
+    "options": {
+     "queryReplacement": "={{ [$('Lookup Invoice').first().json.id] }}"
+    }
+   },
+   "id": "inv-31",
+   "name": "Exec: Check CO Dup",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    1700,
+    -100
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "co-dup?",
+       "leftValue": "={{ String($json.dup) }}",
+       "rightValue": "true",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    }
+   },
+   "id": "inv-32",
+   "name": "CO Billed Elsewhere?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    1900,
+    -100
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "const row = $('Lookup Invoice').first().json;\nconst html = `<html><body style=\"font-family:Helvetica,Arial,sans-serif;margin:2rem;color:#1e293b\"><h1 style=\"color:#dc2626\">Already billed</h1><p>One or more change orders on invoice <strong>${row?.invoice_number ?? ''}</strong> were already billed on another issued invoice, so this one was <strong>not</strong> sent.</p><p>Check the change orders and create a fresh change-order invoice for the unbilled ones.</p></body></html>`;\nreturn [{ json: { html } }];"
+   },
+   "id": "inv-33",
+   "name": "Build Already-Billed Page",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    2100,
+    -200
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "text",
+    "responseBody": "={{ $json.html }}",
+    "options": {
+     "responseCode": 200,
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Content-Type",
+        "value": "text/html; charset=utf-8"
+       }
+      ]
+     }
+    }
+   },
+   "id": "inv-34",
+   "name": "Respond Page (Already Billed)",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1,
+   "position": [
+    2100,
+    0
+   ]
   }
  ],
  "connections": {
@@ -576,7 +701,7 @@
     ],
     [
      {
-      "node": "Render Client Invoice",
+      "node": "Is CO Invoice?",
       "type": "main",
       "index": 0
      }
@@ -595,6 +720,64 @@
     [
      {
       "node": "Build Already-Sent Page",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Is CO Invoice?": {
+   "main": [
+    [
+     {
+      "node": "Exec: Check CO Dup",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Render Client Invoice",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: Check CO Dup": {
+   "main": [
+    [
+     {
+      "node": "CO Billed Elsewhere?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "CO Billed Elsewhere?": {
+   "main": [
+    [
+     {
+      "node": "Build Already-Billed Page",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Render Client Invoice",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build Already-Billed Page": {
+   "main": [
+    [
+     {
+      "node": "Respond Page (Already Billed)",
       "type": "main",
       "index": 0
      }
