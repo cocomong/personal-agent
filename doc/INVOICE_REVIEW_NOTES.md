@@ -309,6 +309,25 @@ Vapi re-synced (25 tools). Backup: /home/ubuntu/backups/pm/pre-billing-co-*.sql.
 
 ---
 
+# 2026-09-06 build 3 — customer payment receipts (D35-D36)
+
+record-then-ask (user choice): record_payment's reply ends with "Want me to
+email a receipt to the customer?" — a "yes" routes to the new
+send_payment_receipt tool (record_payment reply edit + gateway rule idx 25,
+router fallback shifted to idx 26; Vapi now 26 tools). Receipt covers the MOST
+RECENT payment on the invoice. Guards: Receipt Found? / Receipt Sendable?
+(no-email -> update_customer recovery text; no payments -> nothing to receipt).
+Email via gateway gmail node (same creds as previews), audited in
+invoice_email_log kind 'receipt'. Template: branded header w/ GST/PST regs,
+green "Payment received" amount block, per-payment rows when >1, invoice total
+vs total paid vs BALANCE REMAINING (or PAID IN FULL when cleared), payment
+instructions footer. Signed/verified live to own inbox + not-found path;
+fixtures restored. NOTE: n8n import resets workflow active=false — the deploy
+recipe's activate step is mandatory after EVERY import.
+
+
+---
+
 # Future option — schedule-of-values invoicing (user sample 2026-09-06, NOT built)
 
 User's real-world draw layout, captured for later: every value line (Original
