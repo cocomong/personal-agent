@@ -242,6 +242,31 @@ Pre-apply backup: /home/ubuntu/backups/pm/pre-invoice-fixes-20260905-084813.sql.
 
 ---
 
+---
+
+# Future option — schedule-of-values invoicing (user sample 2026-09-06, NOT built)
+
+User's real-world draw layout, captured for later: every value line (Original
+Contract Scope + each approved change order) is billed at the SAME project draw
+percentage, and the invoice shows cumulative columns per line:
+
+| Item | Contract Value | % Complete | Billed to Date | Previous Billed | Current Due |
+| Original Contract Scope | $20,000 | 75% | $15,000 | $10,000 | $5,000 |
+| Change Order #1 (Drywall) | $2,500 | 75% | $1,875 | $1,250 | $625 |
+| Change Order #2 (New: Plumbing) | $1,000 | 75% | $750 | $0 | $750 |
+| Change Order #3 (New: Electrical) | $1,500 | 75% | $1,125 | $0 | $1,125 |
+| Totals | $25,000 | — | $18,750 | $11,250 | $7,500 |
+
+DECISION 2026-09-06: deliberately DEFERRED — keep the app simple now; COs are
+billed at 100% when billed. If adopted later, the design is: invoice_line_items
+becomes the per-line ledger (source_type contract|change_order + source_id +
+incremental amount), % drawn per line is DERIVED (never stored) from the line
+history (billed-to-date = SUM of issued invoice lines for that source; DRAFT and
+voided excluded), two derived views (per-CO status, project schedule of values),
+an invoice void/correct path (cumulative math makes errors expensive), uniform
+project % per draw with auto-include of approved lines, per-line % deferred.
+Tracking answered: "which CO paid at what %" = query, not stored counter.
+
 # 2026-09-05 build 2 — invoice presentation & capture (decisions D25–D30)
 
 User-directed additions to what appears on the client invoice, agreed in
