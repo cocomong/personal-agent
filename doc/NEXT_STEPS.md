@@ -1,3 +1,22 @@
+# NEXT STEPS — status 2026-09-06 (trigger gated: brand, domain, public hosting)
+
+## DEFERRED — trigger: app fully built & functional (post-Step-3 + QA). NOT started.
+User decision 2026-09-06: no domain/brand yet; no website scaffold until the app
+is finished and working. When that trigger fires, plan + build in order:
+1. Brand/product name decision (multi-company product, not Ireh-specific).
+2. Register dedicated domain (.com + .ca if Canadian construction market).
+3. Product website for the app (static; landing, features, screenshots,
+   FAQ, support) — Play Store listing needs a privacy policy URL anyway.
+4. SECURITY-HYGIENE: hide n8n2.ordrnow.com from customers. Branded subdomain
+   (e.g. portal.<domain>) via DNS CNAME/A + Traefik host rule + LE cert on the
+   VPS; expose ONLY /webhook paths publicly; keep the n8n workflow editor
+   admin UI on the internal hostname only. Flip company_profile.portal_base_url
+   + PUBLIC_BASE_URL to the branded host so every customer-facing link/email
+   (approve links, portal pages) shows the brand. Signatures are host-agnostic
+   so old links keep working.
+Guidance recorded: registrar Porkbun/Cloudflare; site = www.<domain>,
+proxy = portal.<domain>; n8n2.ordrnow.com stays internal/admin.
+
 # NEXT STEPS — status 2026-09-06 (simple billing model done)
 
 ## DONE 2026-09-06 — billing model: progress % of ORIGINAL contract + COs billed at 100%
