@@ -1,3 +1,22 @@
+# NEXT STEPS — status 2026-09-07 (customer-identity batch DONE; find_customer live)
+
+## DONE 2026-09-07 — customer identity & tool honesty (doc/CUSTOMER_IDENTITY.md, D42–D46)
+lookup_or_create_customer always returns a row (FOUND-by-email/name w/ dup
+email disclosure vs CREATED); create_project + create_estimate resolve by
+name-or-id (no more uuid crashes) and never fabricate; NEW find_customer
+fuzzy best-match tool (code-node scoring, top-3 w/ labels); TOOL HONESTY
+RULES added to the system prompt. The exact failing scenario now works:
+"create a project for Tom Smith, d_tam@yahoo.com" -> assistant reports the
+email belongs to David Tam and proceeds with him. Deploy learnings for n8n
+2.35.7 (new-node operation/credentials, queryReplacement arity, versioned
+activation) recorded in the doc + skill. Re-test from the app: say "find
+customer Tam" / redo the 5056 Camino flow.
+
+## DEFERRED — silent-death error-output wiring (#3)
+Per-node onError error branches break every execution on n8n 2.35.7; reverted.
+Guaranteed-row SQL + honesty rules are the current protection. Revisit with
+the correct 2.35 error-handling shape (UI or docs) before re-attempting.
+
 # NEXT STEPS — status 2026-09-07 (invoice push channel + text chat channel done)
 
 ## DONE 2026-09-07 — invoice delivery: create -> offer push-or-email; push has View/Approve
