@@ -10,10 +10,13 @@ import '../session/vapi_session_controller.dart';
 /// session (VapiSessionController), so the agent keeps context across
 /// speak-or-type turns.
 class AgentScreen extends StatefulWidget {
-  const AgentScreen({super.key, this.onSignOut});
+  const AgentScreen({super.key, this.onSignOut, this.chat});
 
   /// Optional: called when the user taps the sign-out button (auth gate).
   final VoidCallback? onSignOut;
+
+  /// Optional: inject a ChatController (test seam — widget tests pass a fake).
+  final ChatController? chat;
 
   @override
   State<AgentScreen> createState() => _AgentScreenState();
@@ -21,7 +24,7 @@ class AgentScreen extends StatefulWidget {
 
 class _AgentScreenState extends State<AgentScreen> {
   final VapiSessionController _session = VapiSessionController();
-  final ChatController _chat = ChatController();
+  late final ChatController _chat = widget.chat ?? ChatController();
   final _transcript = <TranscriptEntry>[];
   final _draftController = TextEditingController();
 

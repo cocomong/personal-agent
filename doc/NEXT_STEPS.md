@@ -1,3 +1,15 @@
+## DONE 2026-09-07 — automated tests (doc/TEST_PLAN.md): L0 widget + L1 live E2E
+- L0: mobile-flutter/test/ — AgentScreen smoke + text-chat flow widget tests
+  (mode toggle, send -> user bubble + reply, error path) via an injected
+  FakeChatController (AgentScreen gained an optional `chat` seam).
+  `flutter test` = 5 passing, offline. Pre-existing root-app smoke test was
+  broken headless (auth gate needs plugins) — rewired to AgentScreen.
+- L1: qa/e2e_estimate_approval.py — full create customer/project/estimate ->
+  approve page -> Approve POST -> DB asserts (APPROVED, contract = estimates)
+  -> cleanup. Deterministic (no LLM/credits); regression net for the doubled-
+  webhook-path bug. 8/8 green live.
+- L2 (manual smoke) + L3 (device QA checklists) in TEST_PLAN.md.
+
 ## FIXED 2026-09-07 (commit pending) — estimate/CO Approve button: 'internal server error'
 Customer Approval Portal action webhooks were registered at a DOUBLE path
 (webhook node path 'webhook/estimate/approval' -> external
