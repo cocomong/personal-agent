@@ -1,3 +1,14 @@
+## FIXED 2026-09-07 (commit pending) — estimate/CO Approve button: 'internal server error'
+Customer Approval Portal action webhooks were registered at a DOUBLE path
+(webhook node path 'webhook/estimate/approval' -> external
+/webhook/webhook/estimate/approval) while the rendered forms POST to
+/webhook/estimate/approval — every Approve tap 404'd ('not registered').
+Fixed node paths to 'estimate/approval' / 'change-order/approval'; portal file
+now versioned in repo as backend/n8n/workflows/customer-approval-portal.json.
+Pitfall: when a webhook node's path field contains a full-URL fragment
+('webhook/...'), n8n prepends /webhook/ AGAIN. GET pages (approve-estimate,
+approve-change-order) were unaffected.
+
 # NEXT STEPS — status 2026-09-07 (customer-identity batch DONE; find_customer live)
 
 ## DONE 2026-09-07 — customer identity & tool honesty (doc/CUSTOMER_IDENTITY.md, D42–D46)
