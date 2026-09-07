@@ -112,6 +112,32 @@ class NotificationService {
 
   Future<void> cancelBriefing() => _plugin.cancel(id: _briefingId);
 
+  /// Show an immediate plain notification (no tap action, no payload) —
+  /// used for informational pushes like the PM "estimate approved" notice.
+  Future<void> showNotice({required String title, required String body}) async {
+    if (!_initialized) await init();
+    final id = _nextLinkId++;
+    try {
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _linkChannelId,
+            'Action links',
+            channelDescription: 'Links sent by the assistant (approvals, etc.)',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
+    } catch (e) {
+      debugPrint('showNotice failed: $e');
+    }
+  }
+
   /// Show an immediate action notification. [url] is the default target
   /// (body tap). When [approveUrl]/[rejectUrl] are present the notification
   /// gains View / Approve (Reject) action buttons, and the payload becomes

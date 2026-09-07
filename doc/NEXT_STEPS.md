@@ -1,3 +1,15 @@
+## DONE 2026-09-07 — approval audit trail + PM notice push (doc/APPROVAL_AUDIT.md, D47-D50)
+db/0029 approval_log (+0030 verify, live): kinds estimate_sent/approved/
+rejected + change_order_sent; recipient + Gmail message_id = send-success
+proof; project FK cascade cleans test trails. Gateway logs each approval-request
+email after send; portal writes the customer decision + pushes the PM a
+notice-type FCM message (per-token stale skip; automation signers 'QA …'/
+'… Robot' suppress the push but still log). App gained plain 'notice' handling.
+E2E now asserts the audit row — 9/9 green. Verify visually: install the new
+APK, approve an estimate as customer → PM phone gets "Estimate approved".
+DEFERRED: auto-send estimate to customer on PM finalize (guardrails agreed,
+awaiting go — see doc end).
+
 ## DONE 2026-09-07 — automated tests (doc/TEST_PLAN.md): L0 widget + L1 live E2E
 - L0: mobile-flutter/test/ — AgentScreen smoke + text-chat flow widget tests
   (mode toggle, send -> user bubble + reply, error path) via an injected

@@ -132,6 +132,14 @@ def main():
             f"db row: {row}"
         step("DB: APPROVED, contract value = sum of estimates", lambda: None)
 
+        # Approval decision must be audited (automation signer -> push suppressed,
+        # but the log row is still written).
+        logrow = sql(ssh, f"SELECT kind, note FROM approval_log al JOIN projects p ON p.id = al.project_id WHERE p.title = '{proj}' AND al.kind IN ('estimate_approved','estimate_rejected') ORDER BY al.created_at DESC LIMIT 1;")
+        parts = logrow.split("|")
+        assert len(parts) == 2 and parts[0] == "estimate_approved", f"approval log: {logrow}"
+        assert "QA Robot" in parts[1] and "push suppressed" in parts[1], f"log note: {parts[1]}"
+        step("approval_log records the decision (push suppressed for QA signer)", lambda: None)
+
         # Re-approving the same token must be a no-op (PENDING guard).
         st2, _ = http_post(f"{base}/webhook/estimate/approval",
                            {"token": token, "decision": "approve",

@@ -103,17 +103,24 @@ class FcmService {
       await NotificationService.instance.scheduleDaily(time);
       return;
     }
+    final title = (data['title'] as String?)?.isNotEmpty == true
+        ? data['title'] as String
+        : null;
+    final body = (data['body'] as String?)?.isNotEmpty == true
+        ? data['body'] as String
+        : null;
+    if (data['type'] == 'notice' && title != null && body != null) {
+      // Informational push (e.g. PM "estimate approved" notice) — no tap action.
+      await NotificationService.instance.showNotice(title: title, body: body);
+      return;
+    }
     final url = data['url'];
     if (data['type'] == 'open_url' && url is String && url.isNotEmpty) {
       final approveUrl = data['approve_url'];
       final rejectUrl = data['reject_url'];
       await NotificationService.instance.showLink(
-        title: (data['title'] as String?)?.isNotEmpty == true
-            ? data['title'] as String
-            : 'Action needed',
-        body: (data['body'] as String?)?.isNotEmpty == true
-            ? data['body'] as String
-            : 'Tap to open the link',
+        title: title ?? 'Action needed',
+        body: body ?? 'Tap to open the link',
         url: url,
         approveUrl: approveUrl is String && approveUrl.isNotEmpty
             ? approveUrl
@@ -140,18 +147,25 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await NotificationService.instance.scheduleDaily(time);
     return;
   }
+  final title = (data['title'] as String?)?.isNotEmpty == true
+      ? data['title'] as String
+      : null;
+  final body = (data['body'] as String?)?.isNotEmpty == true
+      ? data['body'] as String
+      : null;
+  if (data['type'] == 'notice' && title != null && body != null) {
+    await NotificationService.instance.init();
+    await NotificationService.instance.showNotice(title: title, body: body);
+    return;
+  }
   final url = data['url'];
   if (data['type'] == 'open_url' && url is String && url.isNotEmpty) {
     final approveUrl = data['approve_url'];
     final rejectUrl = data['reject_url'];
     await NotificationService.instance.init();
     await NotificationService.instance.showLink(
-      title: (data['title'] as String?)?.isNotEmpty == true
-          ? data['title'] as String
-          : 'Action needed',
-      body: (data['body'] as String?)?.isNotEmpty == true
-          ? data['body'] as String
-          : 'Tap to open the link',
+      title: title ?? 'Action needed',
+      body: body ?? 'Tap to open the link',
       url: url,
       approveUrl: approveUrl is String && approveUrl.isNotEmpty
           ? approveUrl

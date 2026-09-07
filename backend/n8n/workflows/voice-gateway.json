@@ -974,7 +974,7 @@
   {
    "parameters": {
     "operation": "executeQuery",
-    "query": "SELECT co.id, co.change_order_number, co.description, co.cost_impact, co.approval_token AS token, p.title AS project_name, c.name AS customer_name, c.email, cp.company_name, cp.email_from_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM change_orders co JOIN projects p ON p.id = co.project_id JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%')) AND co.change_order_number = $2 LIMIT 1;",
+    "query": "SELECT co.id, p.id AS project_id, co.change_order_number, co.description, co.cost_impact, co.approval_token AS token, p.title AS project_name, c.name AS customer_name, c.email, cp.company_name, cp.email_from_name, cp.brand_primary_color, cp.brand_accent_color, cp.brand_success_color, cp.portal_base_url FROM change_orders co JOIN projects p ON p.id = co.project_id JOIN customers c ON c.id = p.customer_id CROSS JOIN company_profile cp WHERE cp.id = 1 AND (p.id::text = $1 OR LOWER(p.title) LIKE LOWER('%' || $1 || '%')) AND co.change_order_number = $2 LIMIT 1;",
     "options": {
      "queryReplacement": "={{ [$json.toolArgs.project_id, $json.toolArgs.change_order_number] }}"
     }
@@ -2072,6 +2072,52 @@
     1180,
     720
    ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "INSERT INTO approval_log (company_id, project_id, kind, recipient, message_id)\nSELECT cp.id, p.id, $1, $2, $3\n  FROM projects p JOIN company_profile cp ON cp.id = p.company_id\n WHERE p.id::text = $4 RETURNING id;",
+    "options": {
+     "queryReplacement": "={{ ['estimate_sent', $('Exec: send_estimate_for_approval_lookup').first().json.email, $('Exec: send_estimate_for_approval_email').first().json.id, $('Exec: send_estimate_for_approval_lookup').first().json.id] }}"
+    }
+   },
+   "id": "exec:-log_approval_email_estimate",
+   "name": "Exec: log_approval_email_estimate",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.2,
+   "position": [
+    960,
+    720
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "INSERT INTO approval_log (company_id, project_id, kind, recipient, message_id)\nSELECT cp.id, p.id, $1, $2, $3\n  FROM projects p JOIN company_profile cp ON cp.id = p.company_id\n WHERE p.id::text = $4 RETURNING id;",
+    "options": {
+     "queryReplacement": "={{ ['change_order_sent', $('Exec: send_change_order_for_approval_lookup').first().json.email, $('Exec: send_change_order_for_approval_email').first().json.id, $('Exec: send_change_order_for_approval_lookup').first().json.project_id] }}"
+    }
+   },
+   "id": "exec:-log_approval_email_change_order",
+   "name": "Exec: log_approval_email_change_order",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.2,
+   "position": [
+    960,
+    860
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
   }
  ],
  "connections": {
@@ -2451,7 +2497,7 @@
    "main": [
     [
      {
-      "node": "Format Spoken Result",
+      "node": "Exec: log_approval_email_estimate",
       "type": "main",
       "index": 0
      }
@@ -2484,7 +2530,7 @@
    "main": [
     [
      {
-      "node": "Format Spoken Result",
+      "node": "Exec: log_approval_email_change_order",
       "type": "main",
       "index": 0
      }
@@ -3033,6 +3079,28 @@
   },
   "Exec: update_company_billing": {
    "main": []
+  },
+  "Exec: log_approval_email_estimate": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: log_approval_email_change_order": {
+   "main": [
+    [
+     {
+      "node": "Format Spoken Result",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
   }
  },
  "id": "5Dswa943KQF0rnZ1"
