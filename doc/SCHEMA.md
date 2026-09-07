@@ -170,6 +170,7 @@
 
 | Column | Type | Flags / default |
 |--------|------|-----------------|
+| `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP (migration 0027) |
 | `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
 | `invoice_id` | `uuid` |  |
 | `source_type` | `character varying(50)` | NOT NULL |

@@ -1501,7 +1501,7 @@
     "operation": "executeQuery",
     "query": "UPDATE invoices SET last_client_html = $2 WHERE id::text = $1 RETURNING id;",
     "options": {
-     "queryReplacement": "={{ [$('Exec: send_customer_invoice_lookup').first().json.id, $json.invoiceHtml] }}"
+     "queryReplacement": "={{ [$('Exec: send_customer_invoice_lookup').first().json.id, $('Render Invoice HTML').first().json.invoiceHtml] }}"
     }
    },
    "id": "gate-0098",
@@ -1524,7 +1524,7 @@
     "operation": "executeQuery",
     "query": "INSERT INTO invoice_email_log (invoice_id, company_id, kind, recipient, message_id)\nSELECT i.id, i.company_id, 'preview', cp.email_from, $1\nFROM invoices i JOIN company_profile cp ON cp.id = i.company_id\nWHERE i.id::text = $2 RETURNING id;",
     "options": {
-     "queryReplacement": "={{ [$json.id, $('Exec: send_customer_invoice_lookup').first().json.id] }}"
+     "queryReplacement": "={{ [$('Exec: send_invoice_preview_email').first().json.id, $('Exec: send_customer_invoice_lookup').first().json.id] }}"
     }
    },
    "id": "gate-0099",
@@ -2169,7 +2169,7 @@
    "main": [
     [
      {
-      "node": "Exec: store_invoice_html",
+      "node": "Render Invoice Preview",
       "type": "main",
       "index": 0
      }
@@ -2520,7 +2520,7 @@
    "main": [
     [
      {
-      "node": "Exec: log_invoice_preview",
+      "node": "Exec: store_invoice_html",
       "type": "main",
       "index": 0
      }
@@ -2531,7 +2531,7 @@
    "main": [
     [
      {
-      "node": "Render Invoice Preview",
+      "node": "Exec: log_invoice_preview",
       "type": "main",
       "index": 0
      }
