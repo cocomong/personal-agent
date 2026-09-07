@@ -69,6 +69,16 @@ class _AgentScreenState extends State<AgentScreen> {
     if (text.isEmpty) return;
     _draftController.clear();
     _append(TranscriptEntry.fromInput(_newId(), text, isVoice: false));
+    // Text needs a live call session (voice and text share one). If the user
+    // types without ever having started (or after ending) a call, start one
+    // muted before sending — otherwise the message silently goes nowhere.
+    if (!_voiceMode && !_session.isConnected) {
+      try {
+        await _session.start();
+      } catch (e) {
+        debugPrint('auto-start for text failed: $e');
+      }
+    }
     await _session.sendUserText(text);
   }
 

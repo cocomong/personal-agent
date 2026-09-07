@@ -39,6 +39,7 @@ class VapiSessionController extends ChangeNotifier {
   Future<void> start() async {
     await init();
     await stop();
+    _lastAgentText = null; // new session: allow an identical reply again
     final overrides = await _fetchSessionOverrides();
     final call = await _client!.start(
       assistantId: vapiAssistantId,
@@ -76,6 +77,7 @@ class VapiSessionController extends ChangeNotifier {
   }
 
   Future<void> sendUserText(String content) async {
+    _lastAgentText = null; // new user turn: same reply text must not dedupe
     await _call?.send({
       'type': 'add-message',
       'message': {'role': 'user', 'content': content},
@@ -111,17 +113,52 @@ class VapiSessionController extends ChangeNotifier {
     }
   }
 
-  /// Surface finalized assistant transcript turns (Vapi `message` events of
-  /// `type: 'transcript'`, `transcriptType: 'final'`, `role: 'assistant'`).
+  /// Surfaces finalized assistant text (spoken OR typed) on the shared
+  /// session. Two event shapes reach us:
+  ///   - voice: type 'transcript', transcriptType 'final', role 'assistant',
+  ///     text under 'transcript';
+  ///   - text chat: type 'message', role 'assistant', text under 'content'
+  ///     (String, or a List of {type:'text', text:...} parts).
+  /// Text replies can arrive through either/both shapes per turn, so the last
+  /// emitted text is remembered and duplicates are dropped.
+  String? _lastAgentText;
+
   void _handleMessage(dynamic value) {
     if (value is! Map) return;
-    if (value['type'] != 'transcript') return;
-    if (value['transcriptType'] != 'final') return;
-    if (value['role'] != 'assistant') return;
-    final text = value['transcript'];
-    if (text is String && text.isNotEmpty) {
-      onAgentTranscript?.call(text);
+    String? text;
+    if (value['type'] == 'transcript') {
+      if (value['transcriptType'] != 'final') return;
+      if (value['role'] != 'assistant') return;
+      final t = value['transcript'];
+      if (t is String) text = t;
+    } else if (value['type'] == 'message' &&
+        (value['role'] == 'assistant' || value['role'] == 'agent')) {
+      text = _textFromContent(value['content']);
     }
+    if (text == null || text.trim().isEmpty) return;
+    final trimmed = text.trim();
+    if (trimmed == _lastAgentText) return; // same turn emitted twice
+    _lastAgentText = trimmed;
+    onAgentTranscript?.call(trimmed);
+  }
+
+  /// 'content' arrives as a plain String or as a List of content parts
+  /// (e.g. [{type:'text', text:'...'}]). Returns the concatenated text.
+  String? _textFromContent(dynamic content) {
+    if (content is String) return content;
+    if (content is List) {
+      final parts = <String>[];
+      for (final c in content) {
+        if (c is Map) {
+          final t = c['text'];
+          if (t is String && t.isNotEmpty) parts.add(t);
+        } else if (c is String && c.isNotEmpty) {
+          parts.add(c);
+        }
+      }
+      return parts.isEmpty ? null : parts.join('\n');
+    }
+    return null;
   }
 
   @override
