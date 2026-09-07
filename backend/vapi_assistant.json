@@ -232,7 +232,7 @@
       "type": "function",
       "function": {
         "name": "create_invoice",
-        "description": "Creates a DRAFT invoice. Two modes by invoice_type:\n- PROGRESS_BILLING / DEPOSIT / FINAL: bills a percentage of the project's ORIGINAL contract value (the signed number). Amount = original contract value x billing_percentage% (default 100 for FINAL), plus GST, and PST only when pst_applicable. The system refuses a percentage that would exceed 100% of the contract when combined with earlier progress invoices.\n- CHANGE_ORDER: ignores billing_percentage and bills EVERY approved change order not yet billed, each at its FULL approved amount as its own itemized line (tax and holdback apply on the total). Call this to bill approved change orders.\nInvoice numbers are assigned automatically per company (e.g. INV-0001) - do not invent one. A short work description is optional. Draft invoices are never sent until the PM approves a preview via send_customer_invoice.",
+        "description": "Creates a DRAFT invoice. Two modes by invoice_type:\n- PROGRESS_BILLING / DEPOSIT / FINAL: bills a percentage of the project's ORIGINAL contract value (the signed number). Amount = original contract value x billing_percentage% (default 100 for FINAL), plus GST, and PST only when pst_applicable. The system refuses a percentage that would exceed 100% of the contract when combined with earlier progress invoices.\n- CHANGE_ORDER: ignores billing_percentage and bills EVERY approved change order not yet billed, each at its FULL approved amount as its own itemized line (tax and holdback apply on the total). Call this to bill approved change orders.\nInvoice numbers are assigned automatically per company (e.g. INV-0001) - do not invent one. A short work description is optional. Draft invoices are never sent until the PM approves a preview via send_customer_invoice. After creating, ask the user whether they want the preview PUSHED TO THEIR PHONE (default) or emailed to their inbox, then call send_invoice_to_phone or send_customer_invoice accordingly.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -278,7 +278,7 @@
       "type": "function",
       "function": {
         "name": "send_customer_invoice",
-        "description": "Emails a PREVIEW of the invoice to the PM's own inbox with Approve / Send-again links; the invoice is emailed to the client ONLY after the PM approves the preview. If the client has no email on file, ask the user for the client's email address, call update_customer_email, then retry. If the invoice was already sent (e.g. the client never received it), tell the PM: approving again will RESEND it to the client.",
+        "description": "Emails a PREVIEW of the invoice to the PM's inbox (company email) with Approve/Reject links; the customer email goes out only after Approve. Use when the user asks to receive the invoice preview BY EMAIL (the alternative channel is send_invoice_to_phone). Emails a PREVIEW of the invoice to the PM's own inbox with Approve / Send-again links; the invoice is emailed to the client ONLY after the PM approves the preview. If the client has no email on file, ask the user for the client's email address, call update_customer_email, then retry. If the invoice was already sent (e.g. the client never received it), tell the PM: approving again will RESEND it to the client.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -851,6 +851,29 @@
           },
           "required": [
             "invoice_number"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_invoice_to_phone",
+        "description": "Pushes a draft invoice's review to the PM's phone as a notification with View (opens the invoice in the browser) and Approve (issues the invoice and emails it to the customer) options. Use when the user answers 'push'/'phone' after creating an invoice (default delivery channel), or any time they ask for the invoice on their phone. Args: invoice_id = invoice number (e.g. INV-0001) or id; project_id optional. Requires the customer to have an email on file (needed for Approve).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "Target project name or ID (optional if invoice_id given)"
+            },
+            "invoice_id": {
+              "type": "string",
+              "description": "Invoice number (e.g. INV-0001) or invoice id to push"
+            }
+          },
+          "required": [
+            "invoice_id"
           ]
         }
       }

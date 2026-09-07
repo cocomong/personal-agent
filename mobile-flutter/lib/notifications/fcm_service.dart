@@ -105,6 +105,8 @@ class FcmService {
     }
     final url = data['url'];
     if (data['type'] == 'open_url' && url is String && url.isNotEmpty) {
+      final approveUrl = data['approve_url'];
+      final rejectUrl = data['reject_url'];
       await NotificationService.instance.showLink(
         title: (data['title'] as String?)?.isNotEmpty == true
             ? data['title'] as String
@@ -113,6 +115,12 @@ class FcmService {
             ? data['body'] as String
             : 'Tap to open the link',
         url: url,
+        approveUrl: approveUrl is String && approveUrl.isNotEmpty
+            ? approveUrl
+            : null,
+        rejectUrl: rejectUrl is String && rejectUrl.isNotEmpty
+            ? rejectUrl
+            : null,
       );
     }
   }
@@ -134,6 +142,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
   final url = data['url'];
   if (data['type'] == 'open_url' && url is String && url.isNotEmpty) {
+    final approveUrl = data['approve_url'];
+    final rejectUrl = data['reject_url'];
     await NotificationService.instance.init();
     await NotificationService.instance.showLink(
       title: (data['title'] as String?)?.isNotEmpty == true
@@ -143,6 +153,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           ? data['body'] as String
           : 'Tap to open the link',
       url: url,
+      approveUrl: approveUrl is String && approveUrl.isNotEmpty
+          ? approveUrl
+          : null,
+      rejectUrl: rejectUrl is String && rejectUrl.isNotEmpty
+          ? rejectUrl
+          : null,
     );
   }
 }

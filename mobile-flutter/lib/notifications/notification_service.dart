@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -23,11 +25,14 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
   int _nextLinkId = 2000;
-  void Function(String? payload)? _onTap;
+  void Function(String? payload, String? actionId)? _onTap;
 
-  /// Invoked (from main) with the notification payload when a notification is
-  /// tapped: payload is the URL for link notifications, null for briefing.
-  set onNotificationTap(void Function(String? payload)? cb) => _onTap = cb;
+  /// Invoked (from main) when a notification is tapped: [payload] is the
+  /// notification payload (a URL string, or JSON {url, actions} for links
+  /// with action buttons); [actionId] is 'view'/'approve'/... or null when
+  /// the notification body itself was tapped.
+  set onNotificationTap(void Function(String? payload, String? actionId)? cb) =>
+      _onTap = cb;
 
   /// Idempotent init. Safe to call from bootstrap AND from the FCM background
   /// isolate (which runs in its own process/isolate).
@@ -46,7 +51,7 @@ class NotificationService {
       await _plugin.initialize(
         settings: const InitializationSettings(android: android, iOS: darwin),
         onDidReceiveNotificationResponse: (response) =>
-            _onTap?.call(response.payload),
+            _onTap?.call(response.payload, response.actionId),
       );
       await _requestPermissions();
       _initialized = true;
@@ -54,7 +59,8 @@ class NotificationService {
       // is only available here, right after initialize.
       final launch = await _plugin.getNotificationAppLaunchDetails();
       if (launch?.didNotificationLaunchApp ?? false) {
-        _onTap?.call(launch?.notificationResponse?.payload);
+        _onTap?.call(launch?.notificationResponse?.payload,
+            launch?.notificationResponse?.actionId);
       }
     } catch (e) {
       debugPrint('NotificationService init failed: $e');
@@ -106,30 +112,81 @@ class NotificationService {
 
   Future<void> cancelBriefing() => _plugin.cancel(id: _briefingId);
 
-  /// Show an immediate action notification whose payload is [url]; tapping it
-  /// routes through the registered [onNotificationTap] handler.
+  /// Show an immediate action notification. [url] is the default target
+  /// (body tap). When [approveUrl]/[rejectUrl] are present the notification
+  /// gains View / Approve (Reject) action buttons, and the payload becomes
+  /// JSON {url, actions:{view, approve, reject}} so taps can route to the
+  /// right URL. Payload stays a plain URL string when there are no actions
+  /// (backwards compatible with existing pushes).
   Future<void> showLink({
     required String title,
     required String body,
     required String url,
+    String? approveUrl,
+    String? rejectUrl,
   }) async {
     if (!_initialized) await init();
     final id = _nextLinkId++;
-    await _plugin.show(
-      id: id,
-      title: title,
-      body: body,
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _linkChannelId,
-          'Action links',
-          channelDescription: 'Links sent by the assistant (approvals, etc.)',
-          importance: Importance.high,
-          priority: Priority.high,
+    final hasActions = approveUrl != null;
+    final payload = hasActions
+        ? jsonEncode({
+            'url': url,
+            'actions': {
+              'view': url,
+              'approve': approveUrl,
+              if (rejectUrl != null) 'reject': rejectUrl,
+            },
+          })
+        : url;
+    final androidActions = hasActions
+        ? [
+            const AndroidNotificationAction('view', 'View',
+                icon: DrawableResourceAndroidBitmap('ic_launcher')),
+            const AndroidNotificationAction('approve', 'Approve',
+                icon: DrawableResourceAndroidBitmap('ic_launcher')),
+            if (rejectUrl != null)
+              const AndroidNotificationAction('reject', 'Reject',
+                  icon: DrawableResourceAndroidBitmap('ic_launcher')),
+          ]
+        : null;
+    try {
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _linkChannelId,
+            'Action links',
+            channelDescription: 'Links sent by the assistant (approvals, etc.)',
+            importance: Importance.high,
+            priority: Priority.high,
+            actions: androidActions,
+          ),
+          iOS: const DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      payload: url,
-    );
+        payload: payload,
+      );
+    } catch (e) {
+      // Fall back to a plain notification (no action buttons) if the platform
+      // rejects the action configuration.
+      debugPrint('showLink with actions failed ($e); retrying plain');
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _linkChannelId,
+            'Action links',
+            channelDescription: 'Links sent by the assistant (approvals, etc.)',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        payload: url,
+      );
+    }
   }
 }

@@ -1,0 +1,247 @@
+{
+ "name": "Invoice Review (PM page)",
+ "nodes": [
+  {
+   "id": "irv-001",
+   "name": "Invoice Review Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    0,
+    0
+   ],
+   "webhookId": "irv-wbhook-001",
+   "parameters": {
+    "httpMethod": "GET",
+    "path": "invoice-review",
+    "responseMode": "responseNode",
+    "options": {}
+   }
+  },
+  {
+   "id": "irv-002",
+   "name": "Verify View Sig",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    180,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// Verify the review-page signature: action 'view', company.invoice.view.exp HMAC.\nconst crypto = require('crypto');\nconst q = $input.first().json.query || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst company = String(q.company || '');\nconst num = String(q.invoice || '');\nconst exp = String(q.exp || '');\nconst action = String(q.action || '');\nconst sig = String(q.sig || '');\nlet ok = false;\nif (secret && company && num && exp && action === 'view' && sig) {\n  const expected = crypto.createHmac('sha256', secret).update(`${company}.${num}.${action}.${exp}`).digest('base64url');\n  const a = Buffer.from(sig); const b = Buffer.from(expected);\n  if (a.length === b.length && crypto.timingSafeEqual(a, b) && Number(exp) * 1000 > Date.now()) ok = true;\n}\nreturn [{ json: { ok, company, invoice: num, exp } }];"
+   }
+  },
+  {
+   "id": "irv-003",
+   "name": "Sig OK?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2,
+   "position": [
+    360,
+    0
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "sig-ok",
+       "leftValue": "={{ $json.ok }}",
+       "rightValue": true,
+       "operator": {
+        "type": "boolean",
+        "operation": "equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "irv-004",
+   "name": "Exec: review_lookup",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    540,
+    -80
+   ],
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT i.company_id, i.invoice_number, i.status, i.issued_date, i.due_date, i.amount_due,\n       i.holdback_amount, i.net_amount, i.gst_amount, i.pst_amount, i.last_client_html,\n       p.title AS project_name,\n       COALESCE(NULLIF(c.company_name, ''), c.name) AS customer_name,\n       cp.company_name AS our_name, cp.gst_reg_number, cp.pst_reg_number,\n       cp.signature_name\nFROM invoices i\nJOIN projects p ON p.id = i.project_id\nJOIN customers c ON c.id = p.customer_id\nJOIN company_profile cp ON cp.id = i.company_id\nWHERE i.id::text = $1 OR i.invoice_number = $1\nLIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$('Verify View Sig').first().json.invoice] }}"
+    }
+   },
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "id": "irv-005",
+   "name": "Build Review Page",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    720,
+    -80
+   ],
+   "parameters": {
+    "jsCode": "const crypto = require('crypto');\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst row = $input.first().json;\nconst mk = (action) => {\n  const exp = Math.floor(Date.now() / 1000) + 90 * 86400;\n  const sig = crypto.createHmac('sha256', secret)\n    .update(`${row.company_id}.${row.invoice_number}.${action}.${exp}`).digest('base64url');\n  return `${base}/webhook/${action === 'approve' ? 'approve' : 'reject'}-invoice?invoice=${encodeURIComponent(row.invoice_number)}&company=${encodeURIComponent(row.company_id)}&exp=${exp}&action=${action}&sig=${encodeURIComponent(sig)}`;\n};\nconst approveUrl = mk('approve');\nconst rejectUrl = mk('reject');\nconst money = (v) => '$' + Number(v ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\nconst statusBadge = (row.status === 'DRAFT')\n  ? '<span style=\"background:#fef3c7;color:#92400e;padding:.2rem .6rem;border-radius:999px;font-size:.75rem\">DRAFT \u2014 not sent</span>'\n  : '<span style=\"background:#dcfce7;color:#166534;padding:.2rem .6rem;border-radius:999px;font-size:.75rem\">' + (row.status || '') + '</span>';\nconst invoiceHtml = (row.last_client_html && String(row.last_client_html).trim().length > 10)\n  ? String(row.last_client_html)\n  : '<div style=\"padding:1.5rem;background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px;color:#6b7280;font-family:Helvetica,Arial,sans-serif\">No rendered preview stored for this invoice yet \u2014 approve to send, or regenerate the preview first.</div>';\nconst page = `<!doctype html><html><head><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Invoice ${row.invoice_number} - review</title></head>\n<body style=\"margin:0;background:#f1f5f9;font-family:Helvetica,Arial,sans-serif\">\n<div style=\"max-width:760px;margin:0 auto;padding:1.25rem\">\n  <div style=\"background:#0f172a;color:#fff;border-radius:12px;padding:1.1rem 1.25rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem\">\n    <div><strong style=\"font-size:1.1rem\">Invoice ${row.invoice_number}</strong>\n      <div style=\"font-size:.8rem;color:#cbd5e1\">${row.our_name || ''} &middot; ${row.project_name || ''} &middot; ${row.customer_name || ''} &middot; ${money(row.amount_due)}</div></div>\n    ${statusBadge}\n  </div>\n  <div style=\"background:#fff;border-radius:12px;margin-top:1rem;padding:1.25rem;display:flex;gap:.75rem;justify-content:flex-end;box-shadow:0 1px 3px rgba(0,0,0,.08)\">\n    <a href=\"${rejectUrl}\" style=\"padding:.7rem 1.4rem;border-radius:8px;border:1px solid #dc2626;color:#dc2626;text-decoration:none;font-weight:600\">Reject</a>\n    <a href=\"${approveUrl}\" style=\"background:#16a34a;color:#fff;padding:.7rem 1.4rem;border-radius:8px;text-decoration:none;font-weight:600\">Approve &amp; send to ${row.customer_name || 'client'}</a>\n  </div>\n  <div style=\"background:#fff;border-radius:12px;margin-top:1rem;padding:.75rem;box-shadow:0 1px 3px rgba(0,0,0,.08)\">${invoiceHtml}</div>\n  <p style=\"font-size:.75rem;color:#94a3b8;text-align:center;margin-top:1rem\">This review link expires in 90 days.</p>\n</div></body></html>`;\nreturn [{ json: { html: page } }];"
+   }
+  },
+  {
+   "id": "irv-006",
+   "name": "Respond Page",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 2,
+   "position": [
+    900,
+    -80
+   ],
+   "parameters": {
+    "respondWith": "text",
+    "responseBody": "={{ $json.html }}",
+    "options": {
+     "responseCode": 200,
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Content-Type",
+        "value": "text/html; charset=utf-8"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": "irv-007",
+   "name": "Build Error Page",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    540,
+    120
+   ],
+   "parameters": {
+    "jsCode": "const q = $input.first().json.query || {};\nconst html = `<!doctype html><html><head><meta charset=\"utf-8\"><title>Invalid link</title></head>\n<body style=\"font-family:Helvetica,Arial,sans-serif;background:#f1f5f9;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0\">\n<div style=\"background:#fff;border-radius:12px;padding:2rem;max-width:420px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.08)\">\n  <div style=\"font-size:2rem\">&#128274;</div>\n  <h2 style=\"margin:.5rem 0\">This link is invalid or has expired</h2>\n  <p style=\"color:#6b7280;font-size:.9rem\">Ask the assistant to push the invoice preview to your phone again.</p>\n</div></body></html>`;\nreturn [{ json: { html } }];"
+   }
+  },
+  {
+   "id": "irv-008",
+   "name": "Respond Error",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 2,
+   "position": [
+    720,
+    120
+   ],
+   "parameters": {
+    "respondWith": "text",
+    "responseBody": "={{ $json.html }}",
+    "options": {
+     "responseCode": 400,
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Content-Type",
+        "value": "text/html; charset=utf-8"
+       }
+      ]
+     }
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Invoice Review Webhook": {
+   "main": [
+    [
+     {
+      "node": "Verify View Sig",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Verify View Sig": {
+   "main": [
+    [
+     {
+      "node": "Sig OK?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sig OK?": {
+   "main": [
+    [
+     {
+      "node": "Exec: review_lookup",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Build Error Page",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: review_lookup": {
+   "main": [
+    [
+     {
+      "node": "Build Review Page",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build Review Page": {
+   "main": [
+    [
+     {
+      "node": "Respond Page",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build Error Page": {
+   "main": [
+    [
+     {
+      "node": "Respond Error",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "active": true,
+ "id": "invoice-review-001"
+}

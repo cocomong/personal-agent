@@ -309,6 +309,43 @@ Vapi re-synced (25 tools). Backup: /home/ubuntu/backups/pm/pre-billing-co-*.sql.
 
 ---
 
+# 2026-09-07 — invoice delivery channels: push-to-phone w/ View/Approve + review page (D37-D40)
+
+User flow decision: after create_invoice, assistant OFFERS "push to your phone or
+emailed?" — default when unspecified = PUSH (D37). Email path unchanged
+(preview + Approve/Reject in inbox). Push path (D38):
+- send_invoice_to_phone tool: renders + stores invoice HTML, then pushes an FCM
+  open_url message carrying url=review page, approve_url, reject_url.
+- App notification shows View / Approve buttons (Approve = one tap: DRAFT ->
+  UNPAID + client email, same as email Approve; View opens the new review page
+  in the browser).
+- New workflow Invoice Review (GET /webhook/invoice-review, HMAC action scope
+  'view'): serves the stored invoice HTML with Approve/Reject buttons — fills
+  the "draft only exists in email" gap (D39).
+- Legacy plain-URL pushes still open on body tap; action payloads are JSON
+  {url, actions:{view,approve,reject}} (D40).
+Verified live: 30% draft by name (INV-0002), push delivered to device, review
+page renders Approve/Reject (fixture customer email points at own inbox so any
+morning Approve tap lands there). N8N gotcha re-hit: every import deactivates;
+activate AFTER import. Vapi 27 tools.
+
+# 2026-09-07 — text chat channel via n8n proxy (Vapi /chat) (D41)
+
+Text mode no longer injects text into a VOICE call (which read replies aloud).
+ChatController -> POST /webhook/chat (n8n proxy, chat-gateway.json):
+X-User-Token -> HMAC session verify (uid; fallback company 1) -> company
+variableValues -> POST api.vapi.ai/chat {assistantId, input, previousChatId}
+w/ VAPI_PRIVATE_KEY env -> {chatId, reply}. Multi-turn via chatId chain.
+Verified: 'list projects' returns real DB data through a full server-side tool
+loop (Vapi /chat DOES execute server tools; returns HTTP 201 — proxy accepts
+200/201 and replies with the LAST assistant text, skipping filler). Voice and
+text are separate sessions by design (matches user's other-project demo).
+Switching to text while a voice call is live ends the call. Env added:
+VAPI_PRIVATE_KEY + VAPI_ASSISTANT_ID (compose passthrough).
+
+
+---
+
 # 2026-09-06 build 3 — customer payment receipts (D35-D36)
 
 record-then-ask (user choice): record_payment's reply ends with "Want me to

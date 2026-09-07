@@ -1,0 +1,207 @@
+{
+ "name": "Chat Proxy (app text -> Vapi /chat)",
+ "nodes": [
+  {
+   "id": "chat-001",
+   "name": "Chat Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    0,
+    0
+   ],
+   "webhookId": "chat-wbhook-001",
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "chat",
+    "responseMode": "responseNode",
+    "options": {}
+   }
+  },
+  {
+   "id": "chat-002",
+   "name": "Resolve Chat Token",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    200,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// Resolve the caller's uid from X-User-Token (HMAC v1 token). No/invalid\n// token -> uid null -> single-tenant fallback (company 1) via the SQL.\nconst crypto = require('crypto');\nconst req = $input.first().json || {};\nconst headers = req.headers || {};\nconst token = String(headers['x-user-token'] || headers['X-User-Token'] || '').trim();\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nlet uid = null;\nif (token && secret) {\n  try {\n    const parts = token.split('.');\n    if (parts.length === 3 && parts[0] === 'v1') {\n      const payloadB64 = parts[1];\n      const expected = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url');\n      const a = Buffer.from(parts[2]); const b = Buffer.from(expected);\n      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {\n        const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());\n        if (payload.uid && payload.exp * 1000 > Date.now()) uid = payload.uid;\n      }\n    }\n  } catch (e) { uid = null; }\n}\nreturn [{ json: { uid } }];"
+   }
+  },
+  {
+   "id": "chat-003",
+   "name": "Exec: chat_context",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.5,
+   "position": [
+    400,
+    0
+   ],
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "SELECT cp.id AS company_id,\n       (cp.setup_completed_at IS NOT NULL) AS setup_complete,\n       cp.company_name,\n       COALESCE(cp.pm_preferred_name, '') AS pm_preferred_name\nFROM company_profile cp\nWHERE cp.id = COALESCE((SELECT company_id FROM users WHERE id = $1::uuid), 1)\nLIMIT 1;",
+    "options": {
+     "queryReplacement": "={{ [$json.uid] }}"
+    }
+   },
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  },
+  {
+   "id": "chat-004",
+   "name": "Call Vapi Chat",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    600,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// POST to Vapi /chat with the resolved company variableValues; keep\n// multi-turn context through previousChatId (client-supplied chatId).\nconst https = require('https');\nconst bodyIn = ($('Chat Webhook').first().json || {}).body || {};\nconst input = typeof bodyIn.input === 'string' ? bodyIn.input.trim() : '';\nconst chatId = typeof bodyIn.chatId === 'string' ? bodyIn.chatId.trim() : '';\nconst apiKey = $env.VAPI_PRIVATE_KEY || '';\nconst assistantId = $env.VAPI_ASSISTANT_ID || '67e2850c-1028-484d-bf52-d948826b2a7e';\nif (!input) return [{ json: { ok: false, statusCode: 400, error: 'CHAT_MISSING_INPUT: body.input is required' } }];\nif (!apiKey) return [{ json: { ok: false, statusCode: 500, error: 'CHAT_KEY_NOT_CONFIGURED' } }];\n\nconst ctx = $input.first().json;\nconst steps = !!ctx.setup_complete ? '' : [\n  '# First-Run Setup (Onboarding) - follow these steps',\n  '- Run onboarding BEFORE any other work when setup is incomplete.',\n  '  1. Company name. 2. PM full name. 3. Preferred daily name.',\n  '  4. Company billing address. 5. GST number (can be added later).',\n  '  6. PST applicable + number (optional). 7. Payment instructions.',\n  '  8. Each worker: name, trade, hourly rate (ask \"anyone else?\").',\n  '  9. Then call complete_onboarding with all fields, and confirm.',\n  '- Never call complete_onboarding before company name, PM name, preferred',\n  '  address, and workers are gathered (empty workers array allowed).',\n].join('\\n');\n\nconst vapiBody = {\n  assistantId,\n  input,\n  assistantOverrides: {\n    variableValues: {\n      setup_complete: !!ctx.setup_complete,\n      company_name: ctx.company_name || '',\n      pm_preferred_name: ctx.pm_preferred_name || '',\n      onboarding_steps: steps,\n    },\n  },\n};\nif (chatId) vapiBody.previousChatId = chatId;\n\nfunction post(u, headers, body) {\n  return new Promise((resolve, reject) => {\n    const m = u.match(/^https?:\\/\\/([^/]+)(\\/[^?#]*)?/);\n    const req = https.request({\n      method: 'POST', hostname: m[1], path: (m[2] || '/'),\n      headers,\n    }, (res) => {\n      let data = ''; res.on('data', (c) => (data += c));\n      res.on('end', () => resolve({ status: res.statusCode, body: data }));\n    });\n    req.on('error', reject); req.write(body); req.end();\n  });\n}\n\nreturn (async () => {\n  try {\n    const resp = await post('https://api.vapi.ai/chat', {\n      'Content-Type': 'application/json',\n      'Authorization': 'Bearer ' + apiKey,\n    }, JSON.stringify(vapiBody));\n    if (resp.status !== 200 && resp.status !== 201) {\n      return [{ json: { ok: false, statusCode: 502, error: 'VAPI_CHAT_ERROR ' + resp.status + ': ' + resp.body.slice(0, 300) } }];\n    }\n    const data = JSON.parse(resp.body);\n    // reply = last assistant text across output messages\n    const out = Array.isArray(data.output) ? data.output : [];\n    // final reply = LAST assistant message that carries text (skips any\n    // intermediate 'just a sec' filler and tool-call frames)\n    let reply = '';\n    for (let i = out.length - 1; i >= 0; i--) {\n      const msg = out[i];\n      if (!msg || msg.role !== 'assistant') continue;\n      const c = msg.content;\n      let t = '';\n      if (typeof c === 'string') t = c;\n      else if (Array.isArray(c)) {\n        for (const p of c) if (p && typeof p.text === 'string') t += p.text;\n      }\n      if (t.trim()) { reply = t.trim(); break; }\n    }\n    return [{ json: { ok: true, chatId: String(data.id || ''), reply, cost: data.cost } }];\n  } catch (e) {\n    return [{ json: { ok: false, statusCode: 502, error: 'CHAT_NETWORK_ERROR: ' + e.message } }];\n  }\n})();\n"
+   }
+  },
+  {
+   "id": "chat-005",
+   "name": "Chat OK?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2,
+   "position": [
+    800,
+    0
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "chat-ok",
+       "leftValue": "={{ $json.ok }}",
+       "rightValue": true,
+       "operator": {
+        "type": "boolean",
+        "operation": "equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "chat-006",
+   "name": "Respond Chat",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 2,
+   "position": [
+    1000,
+    -80
+   ],
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ { chatId: $json.chatId, reply: $json.reply } }}",
+    "options": {
+     "responseCode": 200
+    }
+   }
+  },
+  {
+   "id": "chat-007",
+   "name": "Respond Chat Error",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 2,
+   "position": [
+    1000,
+    120
+   ],
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ { error: $json.error } }}",
+    "options": {
+     "responseCode": 400
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Chat Webhook": {
+   "main": [
+    [
+     {
+      "node": "Resolve Chat Token",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Resolve Chat Token": {
+   "main": [
+    [
+     {
+      "node": "Exec: chat_context",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Exec: chat_context": {
+   "main": [
+    [
+     {
+      "node": "Call Vapi Chat",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Call Vapi Chat": {
+   "main": [
+    [
+     {
+      "node": "Chat OK?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Chat OK?": {
+   "main": [
+    [
+     {
+      "node": "Respond Chat",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Respond Chat Error",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "active": true,
+ "id": "chat-proxy-001"
+}

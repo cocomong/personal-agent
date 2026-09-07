@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/transcript_entry.dart';
+import '../session/chat_controller.dart';
 import '../session/vapi_session_controller.dart';
 
 /// Voice is primary, text is a fallback (ADR-8). Both run on ONE Vapi call
@@ -18,6 +21,7 @@ class AgentScreen extends StatefulWidget {
 
 class _AgentScreenState extends State<AgentScreen> {
   final VapiSessionController _session = VapiSessionController();
+  final ChatController _chat = ChatController();
   final _transcript = <TranscriptEntry>[];
   final _draftController = TextEditingController();
 
@@ -69,23 +73,28 @@ class _AgentScreenState extends State<AgentScreen> {
     if (text.isEmpty) return;
     _draftController.clear();
     _append(TranscriptEntry.fromInput(_newId(), text, isVoice: false));
-    // Text needs a live call session (voice and text share one). If the user
-    // types without ever having started (or after ending) a call, start one
-    // muted before sending — otherwise the message silently goes nowhere.
-    if (!_voiceMode && !_session.isConnected) {
-      try {
-        await _session.start();
-      } catch (e) {
-        debugPrint('auto-start for text failed: $e');
+    try {
+      // Text mode talks to the assistant through the n8n chat proxy (Vapi
+      // /chat): silent, server-side tool execution, no audio session.
+      final reply = await _chat.send(text);
+      if (reply.isNotEmpty) {
+        _append(TranscriptEntry(
+            id: _newId(), role: 'agent', text: reply, isVoice: false));
       }
+    } catch (e) {
+      final msg = e is ChatException ? e.message : 'Something went wrong sending that.';
+      _append(TranscriptEntry(
+          id: _newId(), role: 'agent', text: msg, isVoice: false));
     }
-    await _session.sendUserText(text);
   }
 
   void _onModeChanged(bool voice) {
     setState(() => _voiceMode = voice);
-    // Mute the mic while typing so it is not read as speech (same-session).
-    _session.setMuted(!voice);
+    if (!voice && _session.isConnected) {
+      // Switching to text: end the voice call (text is a separate session
+      // and would otherwise keep reading replies aloud).
+      unawaited(_session.stop());
+    }
   }
 
   @override

@@ -1,3 +1,16 @@
+# NEXT STEPS — status 2026-09-07 (invoice push channel + text chat channel done)
+
+## DONE 2026-09-07 — invoice delivery: create -> offer push-or-email; push has View/Approve
+Review page /webhook/invoice-review (stored invoice HTML + approve/reject);
+send_invoice_to_phone tool; app notification action buttons. Details D37-D40
+in INVOICE_REVIEW_NOTES.md. Manual QA: user phone — create invoice, choose
+push, tap View (page) and Approve (lands in support.ordrnow inbox — fixture
+email points there).
+
+## DONE 2026-09-07 — text chat via n8n proxy to Vapi /chat (silent, separate session)
+Details D41 in INVOICE_REVIEW_NOTES.md. ChatController in app; voice mode
+unchanged. Manual QA: type in Text mode — silent replies with tools working.
+
 # NEXT STEPS — status 2026-09-06 (trigger gated: brand, domain, public hosting)
 
 ## DEFERRED — trigger: app fully built & functional (post-Step-3 + QA). NOT started.

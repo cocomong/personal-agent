@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -20,11 +21,26 @@ Future<void> main() async {
   unawaited(_bootstrap());
 }
 
-/// Opens assistant-sent links (approval pages, etc.) in the system browser.
-/// v1 uses the external browser on purpose — no in-app WebView yet.
-Future<void> _openLinkPayload(String? payload) async {
+/// Opens assistant-sent links (approval pages, invoice review, etc.) in the
+/// system browser. Payload is either a plain URL (legacy pushes) or JSON
+/// {url, actions:{view, approve, reject}} for notifications with action
+/// buttons; [actionId] selects the action URL when a button was tapped.
+Future<void> _openLinkPayload(String? payload, String? actionId) async {
   if (payload == null || payload.isEmpty) return;
-  final uri = Uri.tryParse(payload);
+  var target = payload;
+  try {
+    final decoded = jsonDecode(payload);
+    if (decoded is Map<String, dynamic>) {
+      final actions = decoded['actions'];
+      final picked = actionId != null && actions is Map && actions[actionId] != null
+          ? actions[actionId]
+          : decoded['url'];
+      if (picked is String && picked.isNotEmpty) target = picked;
+    }
+  } catch (_) {
+    // plain URL payload — use as-is
+  }
+  final uri = Uri.tryParse(target);
   if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https')) return;
   try {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
