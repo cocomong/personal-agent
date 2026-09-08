@@ -164,6 +164,25 @@ real line items, scheduled fn_refresh_invoice_statuses (wire with Deadline Remin
 - Backlog: Capabilities KB on Vapi; Deadline Reminder workflow (lien/holdback nudges, email-first);
   real phone-call test.
 
+## NICE-TO-HAVE — admin capability-request loop (discussed 2026-09-08, FILED AWAY)
+Goal: when a PM (any tenant) asks the assistant to do something with NO matching tool, the
+assistant never fakes it — it files a capability request and the ADMIN (developer, not the PM)
+decides what happens. Full design discussed; deliberately not built yet (needs Telegram bot token
++ Hermes gateway decision).
+- Actors: tenant PMs → Vapi assistant (per company); assistant hits missing capability →
+  request_capability tool → row in a `capability_requests` table (company_id source, summary,
+  context, status OPEN → WAIT | PLANNING → PLANNED | DONE | DROPPED, dedupe on identical OPEN/WAIT
+  requests) → Telegram push to the ADMIN (deployment-level setting: admin chat id + bot token,
+  server-side only; never visible to tenant PMs; note in MULTITENANT.md).
+- Buttons/replies: "Plan it" = I do feasibility + planning only (approach, effort, affected
+  pieces, risks) and reply in-thread — an explicit "go" is still required before any build
+  (plan-first rule holds; Plan it NEVER auto-builds). "Wait" = parked, no nag; re-surface via
+  "show pending capability requests" anytime.
+- Transport order: Telegram first (cheapest buttons), WhatsApp/Twilio later; plain email was the
+  original fallback idea. Deferred whole, incl. the request_capability tool + prompt rule
+  ("no matching tool → say so → request_capability, never approximate with another tool") — the
+  prompt-honesty half still worth doing standalone if chat behaviour regresses.
+
 ## DECISION 2026-09-04 — worker PII: option A (data minimization)
 NO worker_profiles table and NO collection of SIN / DOB / address for now. **When the T4/ROE filing
 feature is built, it WILL need per-worker SIN + full address + DOB — collect them at that time** via a
