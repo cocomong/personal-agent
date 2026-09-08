@@ -1,3 +1,15 @@
+## DONE 2026-09-07/08 — read-status tools + invoice totals (D51-D53)
+list_invoices replies now lead with a COMPUTED total + count ('3 invoices
+totaling $41,475: ...') — arithmetic is done in the code node, never trusted
+to the LLM. NEW read-only list_estimate_status (Vapi 29 tools): company-wide
+estimate/approval status per project (baseline PENDING/APPROVED/REJECTED,
+approver + date, estimate line count + total, last approval-log event),
+filter by project or baseline status; guaranteed NONE row so 'no match' is
+spoken. Prompt rule reinforced: never call create_estimate to check status.
+Also deleted the junk $0 DRAFT estimate the assistant created 2026-09-08
+when asked 'any draft estimate' (no such read tool existed then — it does
+now). E2E unaffected; probes live green.
+
 ## DONE 2026-09-07 — approval audit trail + PM notice push (doc/APPROVAL_AUDIT.md, D47-D50)
 db/0029 approval_log (+0030 verify, live): kinds estimate_sent/approved/
 rejected + change_order_sent; recipient + Gmail message_id = send-success

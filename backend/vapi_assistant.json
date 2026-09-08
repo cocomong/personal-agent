@@ -902,6 +902,27 @@
           "required": []
         }
       }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_estimate_status",
+        "description": "READ-ONLY: lists estimate and customer-approval status across the company. Each project shows its baseline status (PENDING / APPROVED / REJECTED / NOT_SET), who approved and when, how many estimate lines and their total, and the most recent approval-log event (e.g. estimate_sent). Optional filters: project (name or id) and status (PENDING, APPROVED, REJECTED). This tool NEVER creates or changes anything - use it to answer 'what is the estimate status', 'any unapproved estimates', 'was it sent', 'is the estimate approved'. Do NOT call create_estimate to check status.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string",
+              "description": "Optional project name or id to narrow to one project"
+            },
+            "status": {
+              "type": "string",
+              "description": "Optional baseline status filter: PENDING, APPROVED, REJECTED"
+            }
+          },
+          "required": []
+        }
+      }
     }
   ],
   "defaultTools": [
