@@ -1,947 +1,944 @@
 {
-  "name": "Ireh Construction PM Assistant",
-  "model": {
-    "provider": "openai",
-    "model": "gpt-4.1-mini",
-    "temperature": 0.2
-  },
-  "voice": {
-    "provider": "vapi",
-    "voiceId": "Elliot"
-  },
-  "transcriber": {
-    "provider": "deepgram"
-  },
-  "firstMessage": "Hi, I'm your construction project assistant. You can log site hours, record payments, run payroll, or ask for a project statement.",
-  "endCallMessage": "Take care!",
-  "systemPrompt": "# Role & Context\nYou are an executive voice project assistant managing 3-4 construction sites. You\ninteract with database systems via tool calls to manage Customers, Projects,\nEstimates, Change Orders, Invoices, and Payroll.\n\n# Setup Status (refreshed automatically at call start)\n- setup_complete: {{setup_complete}}\n- company_name: {{company_name}}\n- pm_preferred_name: {{pm_preferred_name}}\n\nIf setup_complete is false, run the First-Run Setup (Onboarding) section\nbelow BEFORE any other work, even if the caller asks for something else\nfirst - briefly tell them one minute of setup is needed.\n\n{{onboarding_steps}}\n\nFallback if no steps are shown above: ask for the company name, the PM's full\nname, how the PM wants to be addressed daily, the company billing address and GST\nnumber (optional PST number) and payment instructions, then each worker's name,\ntrade, and hourly rate one at a time, and finish with `complete_onboarding`.\n\n# Rules of Operations & Logic\n1. Customer First: Before creating a project, verify or create the Customer record\n   using `lookup_or_create_customer`.\n2. Estimates vs Change Orders:\n   - Base scope = `create_estimate` (sets the baseline contract value).\n   - Any modifications after initial setup = `create_change_order`.\n   - NEVER overwrite the baseline estimate.\n3. Invoicing: progress invoices (PROGRESS_BILLING / DEPOSIT / FINAL) bill a percentage\n   of the project's ORIGINAL contract value. Approved change orders are billed separately\n   at 100% of their approved amount: create a CHANGE_ORDER invoice to bill every approved\n   change order not yet billed, each as its own itemized line. The PM can add a short\n   work description shown on the invoice.\n3b. Sending an invoice always goes through preview approval: `send_customer_invoice` emails\n   a preview to the PM's own inbox with Approve/Reject links, and the client email is sent\n   only after the PM approves. If the client has no email on file, ask the user for it and\n   call `update_customer` first.\n4. Ending calls: when the user says goodbye or the task is finished and the\n   call should end, say a short goodbye and call the `endCall` function so\n   the call actually hangs up.\n5. Communication Style:\n   - Speak in clear, short sentences (10-15 words max).\n   - Confirm critical details (Customer Name, Project Name, Dollar Amounts) before\n     executing tools.\n   - Summarize tool execution outcomes in a single sentence.\n\nTOOL HONESTY RULES (never break these):\n- Only say that something was created, updated, emailed, or sent AFTER the tool result text confirms it (a result mentioning CREATED / FOUND / a confirmation / an amount). If a tool returns an error, 'not found', or nothing useful, say the action could not be completed and quote the reason - NEVER invent a success confirmation.\n- When a customer's email is already on file for someone else, tell the user whose email it is and proceed with that existing customer unless the user says otherwise.\n- Never invent customer IDs or codes like 'Name_Lastname'. If a customer lookup fails, use find_customer to search; if nothing matches, offer lookup_or_create_customer to add a new one.\n- After creating a project or estimate, quote only what the tool confirmed (project name, customer, amount).",
-  "tools": [
-    {
-      "type": "function",
-      "function": {
-        "name": "lookup_or_create_customer",
-        "description": "Checks if a customer exists by email or full name; creates a new customer only if neither matches. When the email already belongs to another customer, returns that existing customer (no duplicate is created) - the result says 'email already on file for <name>'. When it returns an existing customer, use THAT customer for create_project.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "first_name": {
-              "type": "string",
-              "description": "Customer's first name"
-            },
-            "last_name": {
-              "type": "string",
-              "description": "Customer's last name"
-            },
-            "email": {
-              "type": "string",
-              "description": "Customer email address"
-            },
-            "phone": {
-              "type": "string",
-              "description": "Customer phone number"
-            }
-          },
-          "required": [
-            "first_name",
-            "last_name",
-            "email"
-          ]
-        }
+ "name": "Ireh Construction PM Assistant",
+ "model": {
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "temperature": 0.2
+ },
+ "voice": {
+  "provider": "vapi",
+  "voiceId": "Elliot"
+ },
+ "transcriber": {
+  "provider": "deepgram"
+ },
+ "firstMessage": "Hi, I'm your construction project assistant. You can log site hours, record payments, run payroll, or ask for a project statement.",
+ "endCallMessage": "Take care!",
+ "systemPrompt": "# Role & Context\nYou are an executive voice project assistant managing 3-4 construction sites. You\ninteract with database systems via tool calls to manage Customers, Projects,\nEstimates, Change Orders, Invoices, and Payroll.\n\n# Setup Status (refreshed automatically at call start)\n- setup_complete: {{setup_complete}}\n- company_name: {{company_name}}\n- pm_preferred_name: {{pm_preferred_name}}\n\nIf setup_complete is false, run the First-Run Setup (Onboarding) section\nbelow BEFORE any other work, even if the caller asks for something else\nfirst - briefly tell them one minute of setup is needed.\n\n{{onboarding_steps}}\n\nFallback if no steps are shown above: ask for the company name, the PM's full\nname, how the PM wants to be addressed daily, the company billing address and GST\nnumber (optional PST number) and payment instructions, then each worker's name,\ntrade, and hourly rate one at a time, and finish with `complete_onboarding`.\n\n# Rules of Operations & Logic\n1. Customer First: Before creating a project, verify or create the Customer record\n   using `lookup_or_create_customer`.\n2. Estimates vs Change Orders:\n   - Base scope = `create_estimate` (sets the baseline contract value).\n   - Any modifications after initial setup = `create_change_order`.\n   - NEVER overwrite the baseline estimate.\n3. Invoicing: progress invoices (PROGRESS_BILLING / DEPOSIT / FINAL) bill a percentage\n   of the project's ORIGINAL contract value. Approved change orders are billed separately\n   at 100% of their approved amount: create a CHANGE_ORDER invoice to bill every approved\n   change order not yet billed, each as its own itemized line. The PM can add a short\n   work description shown on the invoice.\n3b. Sending an invoice always goes through preview approval: `send_customer_invoice` emails\n   a preview to the PM's own inbox with Approve/Reject links, and the client email is sent\n   only after the PM approves. If the client has no email on file, ask the user for it and\n   call `update_customer` first.\n4. Ending calls: when the user says goodbye or the task is finished and the\n   call should end, say a short goodbye and call the `endCall` function so\n   the call actually hangs up.\n5. Communication Style:\n   - Speak in clear, short sentences (10-15 words max).\n   - Confirm critical details (Customer Name, Project Name, Dollar Amounts) before\n     executing tools.\n   - Summarize tool execution outcomes in a single sentence.\n\n# Status Model (read states, never infer from the log)\n- A project's baseline estimate lives in ONE place: projects.baseline_status.\n  CREATED = estimate on file, not yet sent to the customer. SENT = approval\n  request emailed or link-pushed, awaiting the customer's decision. APPROVED =\n  customer signed (contract value set). REJECTED = customer declined; a revised\n  estimate can be sent again.\n- approval_log rows (estimate_sent / estimate_approved / estimate_rejected) are\n  the EVIDENCE trail of what happened and when - never the current state. Answer\n  'approved?' only from baseline_status = APPROVED (quote who/when from\n  baseline_approved_by / baseline_approved_at). Answer 'sent?' from\n  baseline_status = SENT; the log's estimate_sent row is the proof (recipient +\n  Gmail message id).\n- estimates.status on a scope line is just an on-file marker (CREATED / DRAFT).\n  It NEVER means the customer accepted anything - do not report 'accepted' or\n  'approved' from an estimate line. To send for approval use\n  send_estimate_for_approval (email) or get_estimate_approval_link (push link\n  to the PM's phone); both put the project into SENT. Never call\n  create_estimate or other write tools to check status - use list_estimate_status.\n- When the customer has already approved (baseline_status = APPROVED), do not\n  offer to send the approval link again - say it is already approved, and when.\n\nTOOL HONESTY RULES (never break these):\n- Only say that something was created, updated, emailed, or sent AFTER the tool result text confirms it (a result mentioning CREATED / FOUND / a confirmation / an amount). If a tool returns an error, 'not found', or nothing useful, say the action could not be completed and quote the reason - NEVER invent a success confirmation.\n- When a customer's email is already on file for someone else, tell the user whose email it is and proceed with that existing customer unless the user says otherwise.\n- Never invent customer IDs or codes like 'Name_Lastname'. If a customer lookup fails, use find_customer to search; if nothing matches, offer lookup_or_create_customer to add a new one.\n- After creating a project or estimate, quote only what the tool confirmed (project name, customer, amount).",
+ "tools": [
+  {
+   "type": "function",
+   "function": {
+    "name": "lookup_or_create_customer",
+    "description": "Checks if a customer exists by email or full name; creates a new customer only if neither matches. When the email already belongs to another customer, returns that existing customer (no duplicate is created) - the result says 'email already on file for <name>'. When it returns an existing customer, use THAT customer for create_project.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "first_name": {
+       "type": "string",
+       "description": "Customer's first name"
       },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "create_project",
-        "description": "Creates a new job site for a customer. customer_id accepts the customer's name or their UUID (use the customer from lookup_or_create_customer / find_customer). The tool resolves the customer; a 'CUSTOMER_NOT_FOUND' result means the customer does not exist yet - add them first.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "customer_id": {
-              "type": "string",
-              "description": "UUID of the customer from lookup_or_create_customer"
-            },
-            "project_name": {
-              "type": "string",
-              "description": "Shorthand site name (e.g. Kitsilano Reno)"
-            },
-            "site_address": {
-              "type": "string",
-              "description": "Physical site address"
-            }
-          },
-          "required": [
-            "customer_id",
-            "project_name"
-          ]
-        }
+      "last_name": {
+       "type": "string",
+       "description": "Customer's last name"
       },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "create_estimate",
-        "description": "Creates the initial baseline quote for a project. project_id accepts the project UUID or shorthand name (resolved automatically). Reply only with the result the tool returns.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Target project UUID or shorthand name"
-            },
-            "scope_description": {
-              "type": "string",
-              "description": "Summary of baseline work scope"
-            },
-            "labor_estimate": {
-              "type": "number",
-              "description": "Estimated labor cost"
-            },
-            "material_estimate": {
-              "type": "number",
-              "description": "Estimated material cost"
-            },
-            "revision": {
-              "type": "number",
-              "description": "Quote revision number; default 1"
-            },
-            "status": {
-              "type": "string",
-              "enum": [
-                "DRAFT",
-                "SENT",
-                "ACCEPTED",
-                "DECLINED",
-                "SUPERSEDED"
-              ],
-              "description": "Quote status; default ACCEPTED"
-            },
-            "valid_until": {
-              "type": "string",
-              "description": "Quote validity date (YYYY-MM-DD)"
-            }
-          },
-          "required": [
-            "project_id",
-            "scope_description"
-          ]
-        }
+      "email": {
+       "type": "string",
+       "description": "Customer email address"
       },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
+      "phone": {
+       "type": "string",
+       "description": "Customer phone number"
       }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "create_change_order",
-        "description": "Adds a change order (amendment) to a project. Requires the project name/ID, a description, and the cost impact amount. The project's baseline must already be approved.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Project name or ID"
-            },
-            "description": {
-              "type": "string",
-              "description": "What the change order is for"
-            },
-            "cost_impact": {
-              "type": "number",
-              "description": "Cost impact in dollars (positive = addition, negative = credit)"
-            },
-            "schedule_impact_days": {
-              "type": "number",
-              "description": "Schedule impact in days; defaults to 0"
-            },
-            "reason": {
-              "type": "string",
-              "enum": [
-                "client_change",
-                "site_condition",
-                "owner_directed",
-                "other"
-              ],
-              "description": "Reason for the change"
-            }
-          },
-          "required": [
-            "project_id",
-            "description",
-            "cost_impact"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "log_timesheet",
-        "description": "Logs worked hours for a worker on a specific construction project.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "UUID of the project."
-            },
-            "worker_name": {
-              "type": "string",
-              "description": "Full name of the worker."
-            },
-            "hours_worked": {
-              "type": "number",
-              "description": "Number of hours to log (e.g. 7.5)."
-            },
-            "overtime_hours": {
-              "type": "number",
-              "description": "Overtime hours logged; default 0"
-            },
-            "work_description": {
-              "type": "string",
-              "description": "Summary of tasks performed."
-            }
-          },
-          "required": [
-            "project_id",
-            "worker_name",
-            "hours_worked"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "create_invoice",
-        "description": "Creates a DRAFT invoice. Two modes by invoice_type:\n- PROGRESS_BILLING / DEPOSIT / FINAL: bills a percentage of the project's ORIGINAL contract value (the signed number). Amount = original contract value x billing_percentage% (default 100 for FINAL), plus GST, and PST only when pst_applicable. The system refuses a percentage that would exceed 100% of the contract when combined with earlier progress invoices.\n- CHANGE_ORDER: ignores billing_percentage and bills EVERY approved change order not yet billed, each at its FULL approved amount as its own itemized line (tax and holdback apply on the total). Call this to bill approved change orders.\nInvoice numbers are assigned automatically per company (e.g. INV-0001) - do not invent one. A short work description is optional. Draft invoices are never sent until the PM approves a preview via send_customer_invoice. After creating, ask the user whether they want the preview PUSHED TO THEIR PHONE (default) or emailed to their inbox, then call send_invoice_to_phone or send_customer_invoice accordingly.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Target project UUID or shorthand name"
-            },
-            "invoice_type": {
-              "type": "string",
-              "description": "Canonical invoice type: PROGRESS_BILLING = progress draw (% of original contract), CHANGE_ORDER = bills all unbilled approved change orders at full value, DEPOSIT = deposit draw, FINAL = final draw (no holdback).",
-              "enum": [
-                "DEPOSIT",
-                "PROGRESS_BILLING",
-                "CHANGE_ORDER",
-                "FINAL"
-              ]
-            },
-            "billing_percentage": {
-              "type": "number",
-              "description": "Percentage of the ORIGINAL contract value to bill (e.g. 25 = 25%). Required for progress/deposit invoices; ignored for CHANGE_ORDER invoices."
-            },
-            "pst_applicable": {
-              "type": "boolean",
-              "description": "Apply PST (7%) in addition to GST; default false"
-            },
-            "description": {
-              "type": "string",
-              "description": "Optional one-line description of the work being billed (shown on the invoice)"
-            }
-          },
-          "required": [
-            "project_id",
-            "invoice_type"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "send_customer_invoice",
-        "description": "Emails a PREVIEW of the invoice to the PM's inbox (company email) with Approve/Reject links; the customer email goes out only after Approve. Use when the user asks to receive the invoice preview BY EMAIL (the alternative channel is send_invoice_to_phone). Emails a PREVIEW of the invoice to the PM's own inbox with Approve / Send-again links; the invoice is emailed to the client ONLY after the PM approves the preview. If the client has no email on file, ask the user for the client's email address, call update_customer_email, then retry. If the invoice was already sent (e.g. the client never received it), tell the PM: approving again will RESEND it to the client.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Target project name or ID"
-            },
-            "invoice_id": {
-              "type": "string",
-              "description": "Invoice id or number to preview/send (numbers look like INV-0001)"
-            }
-          },
-          "required": [
-            "project_id"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "get_project_statement",
-        "description": "Retrieves current financial summary, total billed, change orders, and balance due for a project.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "UUID of the project."
-            }
-          },
-          "required": [
-            "project_id"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "get_estimate_approval_link",
-        "description": "Pushes the customer-facing baseline-estimate (contract) approval page to the PM's phone as a tappable notification (type: link sent to phone). Use when the PM wants to send the estimate approval link to their own phone. Args: project_id = project id or name. If no device is registered the link is read out instead.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Target project UUID or shorthand name"
-            }
-          },
-          "required": [
-            "project_id"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "get_change_order_approval_link",
-        "description": "Pushes the customer-facing change-order approval page to the PM's phone as a tappable notification (type: link sent to phone). Use when the PM wants to send the change-order approval link to their own phone. Args: project_id = project id or name; change_order_number e.g. CO-002. If no device is registered the link is read out instead.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Target project UUID or shorthand name"
-            },
-            "change_order_number": {
-              "type": "number",
-              "description": "The change order number to approve (per project)"
-            }
-          },
-          "required": [
-            "project_id",
-            "change_order_number"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "send_estimate_for_approval",
-        "description": "Emails the customer a link to sign the baseline estimate (contract).",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Target project UUID or shorthand name"
-            }
-          },
-          "required": [
-            "project_id"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "send_change_order_for_approval",
-        "description": "Emails the customer a link to sign a change order (amendment).",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Target project UUID or shorthand name"
-            },
-            "change_order_number": {
-              "type": "number",
-              "description": "The change order number to approve (per project)"
-            }
-          },
-          "required": [
-            "project_id",
-            "change_order_number"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "record_payment",
-        "description": "Records a payment received against an invoice and updates the invoice status.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "invoice_number": {
-              "type": "string",
-              "description": "Invoice number, e.g. INV-1002"
-            },
-            "amount": {
-              "type": "number",
-              "description": "Payment amount received"
-            },
-            "payment_date": {
-              "type": "string",
-              "description": "Date received (YYYY-MM-DD); defaults to today"
-            },
-            "method": {
-              "type": "string",
-              "enum": [
-                "E-transfer",
-                "Cheque",
-                "Credit card",
-                "Cash",
-                "Other"
-              ]
-            }
-          },
-          "required": [
-            "invoice_number",
-            "amount"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "run_payroll",
-        "description": "Computes payroll for the current (or given) period from logged timesheets and worker rates.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "period_end": {
-              "type": "string",
-              "description": "Payroll period end date (YYYY-MM-DD); defaults to end of the current month"
-            },
-            "days": {
-              "type": "number",
-              "description": "Period length in days; defaults to the company payroll_period (monthly by default)"
-            }
-          }
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "get_payroll_summary",
-        "description": "Returns the most recent (or a specific period's) payroll run summary.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "period_end": {
-              "type": "string",
-              "description": "Period end date (YYYY-MM-DD); omit for the latest run"
-            }
-          }
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "add_worker",
-        "description": "Adds or updates a worker (name, trade, hourly and overtime rates).",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string",
-              "description": "Full worker name"
-            },
-            "trade": {
-              "type": "string",
-              "description": "Trade, e.g. Framer, Electrician"
-            },
-            "hourly_rate": {
-              "type": "number",
-              "description": "Hourly rate in dollars"
-            },
-            "overtime_rate": {
-              "type": "number",
-              "description": "Overtime rate (defaults to 1.5x hourly)"
-            },
-            "worker_code": {
-              "type": "string",
-              "description": "Optional short code; auto-generated W-### if omitted"
-            }
-          },
-          "required": [
-            "name",
-            "hourly_rate"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "get_dashboard_summary",
-        "description": "Returns the financial dashboard for one project or all projects (contract, paid, balance, labor, margin).",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Optional project name or ID; omit for all projects"
-            }
-          }
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "list_projects",
-        "description": "Lists projects and their financial status (contract value, paid, balance remaining). Optionally filter by project status.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "status": {
-              "type": "string",
-              "description": "Optional project status filter. Values: ACTIVE, COMPLETED, ON_HOLD. Omit to list all projects."
-            }
-          }
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "list_invoices",
-        "description": "Lists invoices and their payment status (amount due, balance due, due date). Optionally filter by invoice status. Use OVERDUE or UNPAID to find who owes money.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "status": {
-              "type": "string",
-              "description": "Optional invoice status filter. Values: UNPAID, PAID, OVERDUE, PARTIAL, DRAFT. Omit to list all."
-            }
-          }
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "get_schedule",
-        "description": "Returns the schedule \u2014 milestones, inspections, permits, deliveries, tasks, and derived events (invoice due dates, quote expiries, lien/holdback deadlines) due within the given number of days. Overdue items are always included. Use for questions like \"what is on my schedule today?\" or \"what is coming up this week?\".",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "days": {
-              "type": "number",
-              "description": "Number of days ahead to look; default 7"
-            }
-          },
-          "required": []
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "set_briefing_time",
-        "description": "Sets the daily briefing time in 24-hour HH:MM format.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "time": {
-              "type": "string",
-              "description": "Time in 24-hour HH:MM, e.g. \"07:30\""
-            }
-          },
-          "required": [
-            "time"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "get_onboarding_status",
-        "description": "Returns whether first-run setup is complete, plus the company name, PM name, preferred daily address, and active worker count.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "complete_onboarding",
-        "description": "Completes first-run setup: registers the company + PM and optionally captures billing details (company billing address, GST number, optional PST number, payment instructions) and the worker list. Re-runs are safe and keep the original completion date. Only call after collecting the company name, PM name, preferred name, and worker list.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "company_name": {
-              "type": "string",
-              "description": "Company name"
-            },
-            "pm_name": {
-              "type": "string",
-              "description": "Project manager full name"
-            },
-            "preferred_name": {
-              "type": "string",
-              "description": "How the PM wants to be addressed every day, e.g. Dave or boss"
-            },
-            "workers": {
-              "type": "array",
-              "description": "Crew members: name, trade, hourly rate",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Full worker name"
-                  },
-                  "trade": {
-                    "type": "string",
-                    "description": "Trade, e.g. Framer, Electrician, Labourer"
-                  },
-                  "hourly_rate": {
-                    "type": "number",
-                    "description": "Hourly rate in dollars"
-                  }
-                },
-                "required": [
-                  "name",
-                  "hourly_rate"
-                ]
-              }
-            },
-            "street_address": {
-              "type": "string",
-              "description": "Company billing street address (invoice header)"
-            },
-            "city": {
-              "type": "string",
-              "description": "Company billing city"
-            },
-            "province": {
-              "type": "string",
-              "description": "Company billing province"
-            },
-            "postal_code": {
-              "type": "string",
-              "description": "Company billing postal code"
-            },
-            "gst_reg_number": {
-              "type": "string",
-              "description": "Company GST/HST registration number"
-            },
-            "pst_reg_number": {
-              "type": "string",
-              "description": "Company BC PST registration number (optional)"
-            },
-            "payment_instructions": {
-              "type": "string",
-              "description": "Free-text how-to-pay instructions for invoices"
-            }
-          },
-          "required": [
-            "company_name",
-            "pm_name",
-            "preferred_name",
-            "workers"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "update_customer",
-        "description": "Updates a customer record: email (validated - a malformed address is refused and nothing is saved), phone, and billing address. Provide only the fields to change. If a send flow reported a missing client email, call this with the address the PM provides, then retry the send. If the customer is not found, do NOT ask the user for an ID - call find_customer to search close matches instead.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "customer_id": {
-              "type": "string",
-              "description": "Customer full name or ID"
-            },
-            "email": {
-              "type": "string",
-              "description": "New email address"
-            },
-            "phone": {
-              "type": "string",
-              "description": "Optional phone number to set"
-            },
-            "street_address": {
-              "type": "string",
-              "description": "Optional billing street address"
-            },
-            "city": {
-              "type": "string",
-              "description": "Optional billing city"
-            },
-            "province": {
-              "type": "string",
-              "description": "Optional billing province/state"
-            },
-            "postal_code": {
-              "type": "string",
-              "description": "Optional billing postal/ZIP code"
-            }
-          },
-          "required": [
-            "customer_id",
-            "email"
-          ]
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "update_company_billing",
-        "description": "Updates the company's invoice billing details: GST registration number, PST registration number (optional), and free-text payment instructions shown on client invoices (\"How to pay\" block). Provide only the fields to change.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "gst_reg_number": {
-              "type": "string",
-              "description": "GST/HST registration number (e.g. 123456789RT0001)"
-            },
-            "pst_reg_number": {
-              "type": "string",
-              "description": "BC PST registration number (optional)"
-            },
-            "payment_instructions": {
-              "type": "string",
-              "description": "Free-text how-to-pay instructions, e.g. \"E-transfer to pay@ireh.ca - reference the invoice number.\""
-            }
-          },
-          "required": []
-        }
-      },
-      "server": {
-        "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
-        "timeoutSeconds": 15
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "send_payment_receipt",
-        "description": "Emails the customer a branded payment receipt for an invoice: shows the payment received (date, method, amount), total paid to date, and the balance remaining on the invoice (or 'paid in full'). Use right after record_payment when the user wants to send a receipt, or anytime a receipt for the most recent payment on an invoice is needed.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "invoice_number": {
-              "type": "string",
-              "description": "Invoice number (e.g. INV-0001) or invoice id. The receipt covers the most recent payment recorded on this invoice."
-            }
-          },
-          "required": [
-            "invoice_number"
-          ]
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "send_invoice_to_phone",
-        "description": "Pushes a draft invoice's review to the PM's phone as a notification with View (opens the invoice in the browser) and Approve (issues the invoice and emails it to the customer) options. Use when the user answers 'push'/'phone' after creating an invoice (default delivery channel), or any time they ask for the invoice on their phone. Args: invoice_id = invoice number (e.g. INV-0001) or id; project_id optional. Requires the customer to have an email on file (needed for Approve).",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Target project name or ID (optional if invoice_id given)"
-            },
-            "invoice_id": {
-              "type": "string",
-              "description": "Invoice number (e.g. INV-0001) or invoice id to push"
-            }
-          },
-          "required": [
-            "invoice_id"
-          ]
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "find_customer",
-        "description": "Searches for customers by best-match on name (typos, partial names, first/last swapped). Returns up to 3 closest matches with a match label ('exact', 'close match', 'possible match') and percent. Use when a customer name does not resolve or when asked to find/look up a customer. Say the matches to the user and ask which one they mean when more than one is returned.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string",
-              "description": "Full or partial customer name to match"
-            },
-            "email": {
-              "type": "string",
-              "description": "Optional exact email to match"
-            },
-            "phone": {
-              "type": "string",
-              "description": "Optional phone to match"
-            }
-          },
-          "required": []
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "list_estimate_status",
-        "description": "READ-ONLY: lists estimate and customer-approval status across the company. Each project shows its baseline status (PENDING / APPROVED / REJECTED / NOT_SET), who approved and when, how many estimate lines and their total, and the most recent approval-log event (e.g. estimate_sent). Optional filters: project (name or id) and status (PENDING, APPROVED, REJECTED). This tool NEVER creates or changes anything - use it to answer 'what is the estimate status', 'any unapproved estimates', 'was it sent', 'is the estimate approved'. Do NOT call create_estimate to check status.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "project": {
-              "type": "string",
-              "description": "Optional project name or id to narrow to one project"
-            },
-            "status": {
-              "type": "string",
-              "description": "Optional baseline status filter: PENDING, APPROVED, REJECTED"
-            }
-          },
-          "required": []
-        }
-      }
+     },
+     "required": [
+      "first_name",
+      "last_name",
+      "email"
+     ]
     }
-  ],
-  "defaultTools": [
-    {
-      "type": "sms",
-      "metadata": {
-        "from": "+17788003883"
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "create_project",
+    "description": "Creates a new job site for a customer. customer_id accepts the customer's name or their UUID (use the customer from lookup_or_create_customer / find_customer). The tool resolves the customer; a 'CUSTOMER_NOT_FOUND' result means the customer does not exist yet - add them first.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "customer_id": {
+       "type": "string",
+       "description": "UUID of the customer from lookup_or_create_customer"
+      },
+      "project_name": {
+       "type": "string",
+       "description": "Shorthand site name (e.g. Kitsilano Reno)"
+      },
+      "site_address": {
+       "type": "string",
+       "description": "Physical site address"
       }
+     },
+     "required": [
+      "customer_id",
+      "project_name"
+     ]
     }
-  ],
-  "serverUrl": "https://n8n2.ordrnow.com/webhook/vapi/assistant-hook",
-  "firstMessageMode": "assistant-speaks-first",
-  "endCallFunctionEnabled": true,
-  "endCallPhrases": [
-    "goodbye",
-    "bye",
-    "see you",
-    "see you later",
-    "take care",
-    "talk to you later"
-  ]
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "create_estimate",
+    "description": "Records a baseline-estimate scope line for a project. project_id accepts the project UUID or shorthand name (resolved automatically). Reply only with the result the tool returns.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Target project UUID or shorthand name"
+      },
+      "scope_description": {
+       "type": "string",
+       "description": "Summary of baseline work scope"
+      },
+      "labor_estimate": {
+       "type": "number",
+       "description": "Estimated labor cost"
+      },
+      "material_estimate": {
+       "type": "number",
+       "description": "Estimated material cost"
+      },
+      "revision": {
+       "type": "number",
+       "description": "Quote revision number; default 1"
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "CREATED",
+        "DRAFT"
+       ],
+       "description": "On-file marker for this scope line: CREATED (default; counts toward the contract when the project baseline is approved) or DRAFT. This is NOT a customer-acceptance status."
+      },
+      "valid_until": {
+       "type": "string",
+       "description": "Quote validity date (YYYY-MM-DD)"
+      }
+     },
+     "required": [
+      "project_id",
+      "scope_description"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "create_change_order",
+    "description": "Adds a change order (amendment) to a project. Requires the project name/ID, a description, and the cost impact amount. The project's baseline must already be approved.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Project name or ID"
+      },
+      "description": {
+       "type": "string",
+       "description": "What the change order is for"
+      },
+      "cost_impact": {
+       "type": "number",
+       "description": "Cost impact in dollars (positive = addition, negative = credit)"
+      },
+      "schedule_impact_days": {
+       "type": "number",
+       "description": "Schedule impact in days; defaults to 0"
+      },
+      "reason": {
+       "type": "string",
+       "enum": [
+        "client_change",
+        "site_condition",
+        "owner_directed",
+        "other"
+       ],
+       "description": "Reason for the change"
+      }
+     },
+     "required": [
+      "project_id",
+      "description",
+      "cost_impact"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "log_timesheet",
+    "description": "Logs worked hours for a worker on a specific construction project.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "UUID of the project."
+      },
+      "worker_name": {
+       "type": "string",
+       "description": "Full name of the worker."
+      },
+      "hours_worked": {
+       "type": "number",
+       "description": "Number of hours to log (e.g. 7.5)."
+      },
+      "overtime_hours": {
+       "type": "number",
+       "description": "Overtime hours logged; default 0"
+      },
+      "work_description": {
+       "type": "string",
+       "description": "Summary of tasks performed."
+      }
+     },
+     "required": [
+      "project_id",
+      "worker_name",
+      "hours_worked"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "create_invoice",
+    "description": "Creates a DRAFT invoice. Two modes by invoice_type:\n- PROGRESS_BILLING / DEPOSIT / FINAL: bills a percentage of the project's ORIGINAL contract value (the signed number). Amount = original contract value x billing_percentage% (default 100 for FINAL), plus GST, and PST only when pst_applicable. The system refuses a percentage that would exceed 100% of the contract when combined with earlier progress invoices.\n- CHANGE_ORDER: ignores billing_percentage and bills EVERY approved change order not yet billed, each at its FULL approved amount as its own itemized line (tax and holdback apply on the total). Call this to bill approved change orders.\nInvoice numbers are assigned automatically per company (e.g. INV-0001) - do not invent one. A short work description is optional. Draft invoices are never sent until the PM approves a preview via send_customer_invoice. After creating, ask the user whether they want the preview PUSHED TO THEIR PHONE (default) or emailed to their inbox, then call send_invoice_to_phone or send_customer_invoice accordingly.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Target project UUID or shorthand name"
+      },
+      "invoice_type": {
+       "type": "string",
+       "description": "Canonical invoice type: PROGRESS_BILLING = progress draw (% of original contract), CHANGE_ORDER = bills all unbilled approved change orders at full value, DEPOSIT = deposit draw, FINAL = final draw (no holdback).",
+       "enum": [
+        "DEPOSIT",
+        "PROGRESS_BILLING",
+        "CHANGE_ORDER",
+        "FINAL"
+       ]
+      },
+      "billing_percentage": {
+       "type": "number",
+       "description": "Percentage of the ORIGINAL contract value to bill (e.g. 25 = 25%). Required for progress/deposit invoices; ignored for CHANGE_ORDER invoices."
+      },
+      "pst_applicable": {
+       "type": "boolean",
+       "description": "Apply PST (7%) in addition to GST; default false"
+      },
+      "description": {
+       "type": "string",
+       "description": "Optional one-line description of the work being billed (shown on the invoice)"
+      }
+     },
+     "required": [
+      "project_id",
+      "invoice_type"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "send_customer_invoice",
+    "description": "Emails a PREVIEW of the invoice to the PM's inbox (company email) with Approve/Reject links; the customer email goes out only after Approve. Use when the user asks to receive the invoice preview BY EMAIL (the alternative channel is send_invoice_to_phone). Emails a PREVIEW of the invoice to the PM's own inbox with Approve / Send-again links; the invoice is emailed to the client ONLY after the PM approves the preview. If the client has no email on file, ask the user for the client's email address, call update_customer_email, then retry. If the invoice was already sent (e.g. the client never received it), tell the PM: approving again will RESEND it to the client.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Target project name or ID"
+      },
+      "invoice_id": {
+       "type": "string",
+       "description": "Invoice id or number to preview/send (numbers look like INV-0001)"
+      }
+     },
+     "required": [
+      "project_id"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "get_project_statement",
+    "description": "Retrieves current financial summary, total billed, change orders, and balance due for a project.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "UUID of the project."
+      }
+     },
+     "required": [
+      "project_id"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "get_estimate_approval_link",
+    "description": "Pushes the customer-facing baseline-estimate (contract) approval page to the PM's phone as a tappable notification (type: link sent to phone) - use when the PM wants to present the approval link to the customer on site. Presenting the link moves the baseline to SENT (awaiting the customer), so it counts as sending it for approval. If no device is registered the link is read out instead. If the baseline is already APPROVED, say so - do not call this tool.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Target project UUID or shorthand name"
+      }
+     },
+     "required": [
+      "project_id"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "get_change_order_approval_link",
+    "description": "Pushes the customer-facing change-order approval page to the PM's phone as a tappable notification (type: link sent to phone). Use when the PM wants to send the change-order approval link to their own phone. Args: project_id = project id or name; change_order_number e.g. CO-002. If no device is registered the link is read out instead.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Target project UUID or shorthand name"
+      },
+      "change_order_number": {
+       "type": "number",
+       "description": "The change order number to approve (per project)"
+      }
+     },
+     "required": [
+      "project_id",
+      "change_order_number"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "send_estimate_for_approval",
+    "description": "Emails the customer a link to sign the baseline estimate (contract). Only call this when the project's baseline is NOT yet approved: it moves the baseline to SENT (awaiting the customer) and refreshes the approval link. If the baseline is already APPROVED, say it is already approved instead of calling this tool. Requires the customer to have an email on file (update_customer can set it).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Target project UUID or shorthand name"
+      }
+     },
+     "required": [
+      "project_id"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "send_change_order_for_approval",
+    "description": "Emails the customer a link to sign a change order (amendment).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Target project UUID or shorthand name"
+      },
+      "change_order_number": {
+       "type": "number",
+       "description": "The change order number to approve (per project)"
+      }
+     },
+     "required": [
+      "project_id",
+      "change_order_number"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "record_payment",
+    "description": "Records a payment received against an invoice and updates the invoice status.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "invoice_number": {
+       "type": "string",
+       "description": "Invoice number, e.g. INV-1002"
+      },
+      "amount": {
+       "type": "number",
+       "description": "Payment amount received"
+      },
+      "payment_date": {
+       "type": "string",
+       "description": "Date received (YYYY-MM-DD); defaults to today"
+      },
+      "method": {
+       "type": "string",
+       "enum": [
+        "E-transfer",
+        "Cheque",
+        "Credit card",
+        "Cash",
+        "Other"
+       ]
+      }
+     },
+     "required": [
+      "invoice_number",
+      "amount"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "run_payroll",
+    "description": "Computes payroll for the current (or given) period from logged timesheets and worker rates.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "period_end": {
+       "type": "string",
+       "description": "Payroll period end date (YYYY-MM-DD); defaults to end of the current month"
+      },
+      "days": {
+       "type": "number",
+       "description": "Period length in days; defaults to the company payroll_period (monthly by default)"
+      }
+     }
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "get_payroll_summary",
+    "description": "Returns the most recent (or a specific period's) payroll run summary.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "period_end": {
+       "type": "string",
+       "description": "Period end date (YYYY-MM-DD); omit for the latest run"
+      }
+     }
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "add_worker",
+    "description": "Adds or updates a worker (name, trade, hourly and overtime rates).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "description": "Full worker name"
+      },
+      "trade": {
+       "type": "string",
+       "description": "Trade, e.g. Framer, Electrician"
+      },
+      "hourly_rate": {
+       "type": "number",
+       "description": "Hourly rate in dollars"
+      },
+      "overtime_rate": {
+       "type": "number",
+       "description": "Overtime rate (defaults to 1.5x hourly)"
+      },
+      "worker_code": {
+       "type": "string",
+       "description": "Optional short code; auto-generated W-### if omitted"
+      }
+     },
+     "required": [
+      "name",
+      "hourly_rate"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "get_dashboard_summary",
+    "description": "Returns the financial dashboard for one project or all projects (contract, paid, balance, labor, margin).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Optional project name or ID; omit for all projects"
+      }
+     }
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "list_projects",
+    "description": "Lists projects and their financial status (contract value, paid, balance remaining). Optionally filter by project status.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string",
+       "description": "Optional project status filter. Values: ACTIVE, COMPLETED, ON_HOLD. Omit to list all projects."
+      }
+     }
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "list_invoices",
+    "description": "Lists invoices and their payment status (amount due, balance due, due date). Optionally filter by invoice status. Use OVERDUE or UNPAID to find who owes money.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "status": {
+       "type": "string",
+       "description": "Optional invoice status filter. Values: UNPAID, PAID, OVERDUE, PARTIAL, DRAFT. Omit to list all."
+      }
+     }
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "get_schedule",
+    "description": "Returns the schedule \u2014 milestones, inspections, permits, deliveries, tasks, and derived events (invoice due dates, quote expiries, lien/holdback deadlines) due within the given number of days. Overdue items are always included. Use for questions like \"what is on my schedule today?\" or \"what is coming up this week?\".",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "days": {
+       "type": "number",
+       "description": "Number of days ahead to look; default 7"
+      }
+     },
+     "required": []
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "set_briefing_time",
+    "description": "Sets the daily briefing time in 24-hour HH:MM format.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "time": {
+       "type": "string",
+       "description": "Time in 24-hour HH:MM, e.g. \"07:30\""
+      }
+     },
+     "required": [
+      "time"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "get_onboarding_status",
+    "description": "Returns whether first-run setup is complete, plus the company name, PM name, preferred daily address, and active worker count.",
+    "parameters": {
+     "type": "object",
+     "properties": {},
+     "required": []
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "complete_onboarding",
+    "description": "Completes first-run setup: registers the company + PM and optionally captures billing details (company billing address, GST number, optional PST number, payment instructions) and the worker list. Re-runs are safe and keep the original completion date. Only call after collecting the company name, PM name, preferred name, and worker list.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "company_name": {
+       "type": "string",
+       "description": "Company name"
+      },
+      "pm_name": {
+       "type": "string",
+       "description": "Project manager full name"
+      },
+      "preferred_name": {
+       "type": "string",
+       "description": "How the PM wants to be addressed every day, e.g. Dave or boss"
+      },
+      "workers": {
+       "type": "array",
+       "description": "Crew members: name, trade, hourly rate",
+       "items": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string",
+          "description": "Full worker name"
+         },
+         "trade": {
+          "type": "string",
+          "description": "Trade, e.g. Framer, Electrician, Labourer"
+         },
+         "hourly_rate": {
+          "type": "number",
+          "description": "Hourly rate in dollars"
+         }
+        },
+        "required": [
+         "name",
+         "hourly_rate"
+        ]
+       }
+      },
+      "street_address": {
+       "type": "string",
+       "description": "Company billing street address (invoice header)"
+      },
+      "city": {
+       "type": "string",
+       "description": "Company billing city"
+      },
+      "province": {
+       "type": "string",
+       "description": "Company billing province"
+      },
+      "postal_code": {
+       "type": "string",
+       "description": "Company billing postal code"
+      },
+      "gst_reg_number": {
+       "type": "string",
+       "description": "Company GST/HST registration number"
+      },
+      "pst_reg_number": {
+       "type": "string",
+       "description": "Company BC PST registration number (optional)"
+      },
+      "payment_instructions": {
+       "type": "string",
+       "description": "Free-text how-to-pay instructions for invoices"
+      }
+     },
+     "required": [
+      "company_name",
+      "pm_name",
+      "preferred_name",
+      "workers"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "update_customer",
+    "description": "Updates a customer record: email (validated - a malformed address is refused and nothing is saved), phone, and billing address. Provide only the fields to change. If a send flow reported a missing client email, call this with the address the PM provides, then retry the send. If the customer is not found, do NOT ask the user for an ID - call find_customer to search close matches instead.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "customer_id": {
+       "type": "string",
+       "description": "Customer full name or ID"
+      },
+      "email": {
+       "type": "string",
+       "description": "New email address"
+      },
+      "phone": {
+       "type": "string",
+       "description": "Optional phone number to set"
+      },
+      "street_address": {
+       "type": "string",
+       "description": "Optional billing street address"
+      },
+      "city": {
+       "type": "string",
+       "description": "Optional billing city"
+      },
+      "province": {
+       "type": "string",
+       "description": "Optional billing province/state"
+      },
+      "postal_code": {
+       "type": "string",
+       "description": "Optional billing postal/ZIP code"
+      }
+     },
+     "required": [
+      "customer_id",
+      "email"
+     ]
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "update_company_billing",
+    "description": "Updates the company's invoice billing details: GST registration number, PST registration number (optional), and free-text payment instructions shown on client invoices (\"How to pay\" block). Provide only the fields to change.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "gst_reg_number": {
+       "type": "string",
+       "description": "GST/HST registration number (e.g. 123456789RT0001)"
+      },
+      "pst_reg_number": {
+       "type": "string",
+       "description": "BC PST registration number (optional)"
+      },
+      "payment_instructions": {
+       "type": "string",
+       "description": "Free-text how-to-pay instructions, e.g. \"E-transfer to pay@ireh.ca - reference the invoice number.\""
+      }
+     },
+     "required": []
+    }
+   },
+   "server": {
+    "url": "https://n8n2.ordrnow.com/webhook/voice/gateway",
+    "timeoutSeconds": 15
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "send_payment_receipt",
+    "description": "Emails the customer a branded payment receipt for an invoice: shows the payment received (date, method, amount), total paid to date, and the balance remaining on the invoice (or 'paid in full'). Use right after record_payment when the user wants to send a receipt, or anytime a receipt for the most recent payment on an invoice is needed.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "invoice_number": {
+       "type": "string",
+       "description": "Invoice number (e.g. INV-0001) or invoice id. The receipt covers the most recent payment recorded on this invoice."
+      }
+     },
+     "required": [
+      "invoice_number"
+     ]
+    }
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "send_invoice_to_phone",
+    "description": "Pushes a draft invoice's review to the PM's phone as a notification with View (opens the invoice in the browser) and Approve (issues the invoice and emails it to the customer) options. Use when the user answers 'push'/'phone' after creating an invoice (default delivery channel), or any time they ask for the invoice on their phone. Args: invoice_id = invoice number (e.g. INV-0001) or id; project_id optional. Requires the customer to have an email on file (needed for Approve).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project_id": {
+       "type": "string",
+       "description": "Target project name or ID (optional if invoice_id given)"
+      },
+      "invoice_id": {
+       "type": "string",
+       "description": "Invoice number (e.g. INV-0001) or invoice id to push"
+      }
+     },
+     "required": [
+      "invoice_id"
+     ]
+    }
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "find_customer",
+    "description": "Searches for customers by best-match on name (typos, partial names, first/last swapped). Returns up to 3 closest matches with a match label ('exact', 'close match', 'possible match') and percent. Use when a customer name does not resolve or when asked to find/look up a customer. Say the matches to the user and ask which one they mean when more than one is returned.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string",
+       "description": "Full or partial customer name to match"
+      },
+      "email": {
+       "type": "string",
+       "description": "Optional exact email to match"
+      },
+      "phone": {
+       "type": "string",
+       "description": "Optional phone to match"
+      }
+     },
+     "required": []
+    }
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "list_estimate_status",
+    "description": "READ-ONLY: lists estimate and customer-approval status across the company. Each project shows its baseline status (CREATED / SENT / APPROVED / REJECTED / NOT_SET), who approved and when, how many estimate lines and their total, and the most recent approval-log event (e.g. estimate_sent). Optional filters: project (name or id) and status (CREATED, SENT, APPROVED, REJECTED). This tool NEVER creates or changes anything - use it to answer 'what is the estimate status', 'any unapproved estimates', 'was it sent', 'is the estimate approved'. Do NOT call create_estimate to check status.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "project": {
+       "type": "string",
+       "description": "Optional project name or id to narrow to one project"
+      },
+      "status": {
+       "type": "string",
+       "description": "Optional baseline status filter: CREATED, SENT, APPROVED, REJECTED"
+      }
+     },
+     "required": []
+    }
+   }
+  }
+ ],
+ "defaultTools": [
+  {
+   "type": "sms",
+   "metadata": {
+    "from": "+17788003883"
+   }
+  }
+ ],
+ "serverUrl": "https://n8n2.ordrnow.com/webhook/vapi/assistant-hook",
+ "firstMessageMode": "assistant-speaks-first",
+ "endCallFunctionEnabled": true,
+ "endCallPhrases": [
+  "goodbye",
+  "bye",
+  "see you",
+  "see you later",
+  "take care",
+  "talk to you later"
+ ]
 }
