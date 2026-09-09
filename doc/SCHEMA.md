@@ -1,6 +1,6 @@
 # Database Schema — live (generated)
 
-> **Generated 2026-09-05 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0025 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
+> **Generated 2026-09-08 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0031 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
 
 ## Conventions
 - Every business table PK is `id UUID DEFAULT uuid_generate_v4()` (uuid-ossp).
@@ -10,14 +10,14 @@
 - Outbound invoice emails (preview / client / resend / reject) are audited in `invoice_email_log` (0021). `invoices.email_sent_at` = first client send; `last_client_html` = the canonical client HTML stored at preview time (approve emails that copy, so previewed == sent).
 - Children that inherit tenancy via a parent's `project_id` (estimates, change_orders, timesheets, invoice_line_items, payments, payroll_entries) carry no company_id column.
 - Worker identity: `workers.id` (uuid) is the FK target; `worker_code` (W-###) is a per-company unique display/code handle — two companies may each have a W-001.
-
+- Baseline-estimate workflow state lives on `projects.baseline_status`: CREATED (on file, never sent) → SENT (awaiting customer) → APPROVED / REJECTED (0031). `approval_log` (0029) is the evidence trail; never consult it as current state.
 ## Company & tenancy
 
 ### company_profile
 
 | Column | Type | Flags / default |
 |--------|------|-----------------|
-| `id` | `smallint` | PK, NOT NULL, default (nextval('company_profile_id_seq'::regclass)) |
+| `id` | `smallint` | NOT NULL, default (nextval('company_profile_id_seq'::regclass)) |
 | `company_name` | `character varying(255)` | NOT NULL, default 'Ireh Construction' |
 | `legal_name` | `character varying(255)` | NOT NULL, default 'Ireh Construction' |
 | `street_address` | `text` | NOT NULL, default '1951 Kaptey Ave' |
@@ -58,24 +58,26 @@
 | `gst_reg_number` | `character varying(50)` |  |
 | `pst_reg_number` | `character varying(50)` |  |
 | `payment_instructions` | `text` | Free-text how-to-pay block shown on client invoices |
-- FK: `created_by_user` → `users(id)` (ON DELETE NO ACTION)
+- FK: `created_by_user` → `users(id)`
+- PK constraint `company_profile_pkey`
 
-*created in 0007_company_profile; extended in 0014_schedule, 0016_onboarding, 0019_tenant_columns, 0021_invoice_fixes, 0023_invoice_presentation*
+*created in 0007_company_profile, 0014_schedule, 0016_onboarding, 0019_tenant_columns, 0021_invoice_fixes, 0023_invoice_presentation*
 
 ### users
 
 | Column | Type | Flags / default |
 |--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
 | `google_sub` | `character varying(255)` | NOT NULL |
 | `email` | `character varying(255)` | NOT NULL |
 | `name` | `character varying(255)` |  |
-| `company_id` | `smallint` | tenant |
+| `company_id` | `smallint` |  |
 | `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
 | `last_login_at` | `timestamp with time zone` |  |
-- FK: `company_id` → `company_profile(id)` (ON DELETE SET NULL)
-- UNIQUE constraint `users_email_key` (`email`)
-- UNIQUE constraint `users_google_sub_key` (`google_sub`)
+- FK: `company_id` → `company_profile(id)`
+- UNIQUE constraint `users_email_key` (email)
+- UNIQUE constraint `users_google_sub_key` (google_sub)
+- PK constraint `users_pkey`
 - index `idx_users_company`
 
 *created in 0017_accounts*
@@ -86,28 +88,29 @@
 
 | Column | Type | Flags / default |
 |--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
 | `name` | `character varying(255)` | NOT NULL |
 | `company_name` | `character varying(255)` |  |
 | `email` | `character varying(255)` | NOT NULL |
 | `phone` | `character varying(50)` |  |
 | `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
-| `company_id` | `smallint` | NOT NULL, default 1, tenant |
+| `company_id` | `smallint` | NOT NULL, default 1 |
 | `street_address` | `text` |  |
 | `city` | `character varying(100)` |  |
 | `province` | `character varying(50)` |  |
 | `postal_code` | `character varying(20)` |  |
-- FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
+- FK: `company_id` → `company_profile(id)`
+- PK constraint `customers_pkey`
 - index `idx_customers_company`
-- UNIQUE index `uq_customers_company_email` (per-company unique; Step 2)
+- index `uq_customers_company_email`
 
-*created in 0001_init; extended in 0019_tenant_columns, 0023_invoice_presentation*
+*created in 0001_init, 0019_tenant_columns, 0023_invoice_presentation*
 
 ### projects
 
 | Column | Type | Flags / default |
 |--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
 | `customer_id` | `uuid` |  |
 | `title` | `character varying(255)` | NOT NULL |
 | `site_address` | `text` | NOT NULL |
@@ -115,7 +118,7 @@
 | `revised_contract_value` | `numeric(12,2)` | NOT NULL, default 0.00 |
 | `status` | `character varying(50)` | default 'ACTIVE' |
 | `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
-| `baseline_status` | `character varying(50)` | NOT NULL, default 'PENDING' |
+| `baseline_status` | `character varying(50)` | NOT NULL, default 'CREATED', Baseline-estimate workflow state: CREATED (on file, never sent) -> SENT (awaiting customer) -> APPROVED | REJECTED. Truth of the entity; approval_log is the evidence trail. |
 | `baseline_approved_at` | `timestamp with time zone` |  |
 | `baseline_approved_by` | `character varying(50)` |  |
 | `baseline_approval_method` | `character varying(50)` |  |
@@ -124,128 +127,40 @@
 | `completed_at` | `date` |  |
 | `scheduled_start` | `date` |  |
 | `target_completion` | `date` |  |
-| `company_id` | `smallint` | NOT NULL, default 1, tenant |
-- FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
-- FK: `customer_id` → `customers(id)` (ON DELETE CASCADE)
+| `company_id` | `smallint` | NOT NULL, default 1 |
+- FK: `company_id` → `company_profile(id)`
+- FK: `customer_id` → `customers(id)`
+- PK constraint `projects_pkey`
 - index `idx_projects_company`
 - index `idx_projects_customer`
 
-*created in 0001_init; extended in 0005_customer_approval, 0006_signer_name, 0014_schedule, 0019_tenant_columns*
-
-## Invoicing & payments
-
-### invoices
-
-| Column | Type | Flags / default |
-|--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
-| `project_id` | `uuid` |  |
-| `invoice_number` | `character varying(100)` | NOT NULL |
-| `invoice_type` | `character varying(50)` | NOT NULL |
-| `amount_due` | `numeric(12,2)` | NOT NULL |
-| `holdback_amount` | `numeric(12,2)` | default 0.00 |
-| `status` | `character varying(50)` | default 'UNPAID' |
-| `issued_date` | `date` | default CURRENT_DATE |
-| `due_date` | `date` | NOT NULL |
-| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
-| `net_amount` | `numeric(12,2)` | NOT NULL |
-| `gst_amount` | `numeric(12,2)` | NOT NULL, default 0.00 |
-| `pst_amount` | `numeric(12,2)` | NOT NULL, default 0.00 |
-| `pst_applicable` | `boolean` | NOT NULL, default false |
-| `email_sent_at` | `timestamp with time zone` |  |
-| `company_id` | `smallint` | NOT NULL, default 1, tenant |
-| `description` | `text` |  |
-| `last_client_html` | `text` | Canonical client HTML stored at preview time; approve workflow emails this copy |
-| `billing_percentage` | `numeric(6,2)` | Snapshot: percent of revised contract value billed at creation |
-| `billed_basis` | `numeric(12,2)` | Snapshot: revised contract value the invoice percentage was applied to |
-- FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
-- FK: `project_id` → `projects(id)` (ON DELETE CASCADE)
-- index `idx_invoices_company`
-- index `idx_invoices_project`
-- UNIQUE index `uq_invoices_company_invoice_number` (per-company unique; Step 2)
-
-*created in 0001_init; extended in 0009_tax_payments, 0018_invoice_send, 0019_tenant_columns, 0021_invoice_fixes, 0023_invoice_presentation*
-
-### invoice_line_items
-
-| Column | Type | Flags / default |
-|--------|------|-----------------|
-| `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP (migration 0027) |
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
-| `invoice_id` | `uuid` |  |
-| `source_type` | `character varying(50)` | NOT NULL |
-| `source_id` | `uuid` |  |
-| `description` | `text` | NOT NULL |
-| `amount` | `numeric(12,2)` | NOT NULL |
-- FK: `invoice_id` → `invoices(id)` (ON DELETE CASCADE)
-- index `idx_invoice_line_items_invoice`
-- UNIQUE index `uq_invoice_line_items_source` (per-company unique; Step 2)
-
-*created in 0001_init*
-
-### payments
-
-| Column | Type | Flags / default |
-|--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
-| `invoice_id` | `uuid` | NOT NULL |
-| `payment_date` | `date` | NOT NULL, default CURRENT_DATE |
-| `amount` | `numeric(12,2)` | NOT NULL |
-| `method` | `character varying(50)` |  |
-| `notes` | `text` |  |
-| `tool_call_id` | `character varying(100)` |  |
-| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
-- FK: `invoice_id` → `invoices(id)` (ON DELETE CASCADE)
-- CHECK `payments_amount_check`: `CHECK ((amount > (0)::numeric))`
-- UNIQUE constraint `payments_tool_call_id_key` (`tool_call_id`)
-- index `idx_payments_invoice`
-
-*created in 0009_tax_payments*
-
-### invoice_email_log
-
-| Column | Type | Flags / default |
-|--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
-| `invoice_id` | `uuid` | NOT NULL |
-| `company_id` | `smallint` | NOT NULL, default 1, tenant |
-| `kind` | `character varying(20)` | NOT NULL |
-| `recipient` | `character varying(255)` |  |
-| `message_id` | `character varying(255)` |  |
-| `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
-- FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
-- FK: `invoice_id` → `invoices(id)` (ON DELETE CASCADE)
-- index `idx_invoice_email_log_company`
-- index `idx_invoice_email_log_invoice`
-
-*created in 0021_invoice_fixes*
-
-## Quotes & change orders
+*created in 0001_init, 0005_customer_approval, 0006_signer_name, 0014_schedule, 0019_tenant_columns*
 
 ### estimates
 
 | Column | Type | Flags / default |
 |--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
 | `project_id` | `uuid` |  |
 | `division_code` | `character varying(50)` | NOT NULL |
 | `scope_description` | `text` | NOT NULL |
 | `allocated_amount` | `numeric(12,2)` | NOT NULL, default 0.00 |
 | `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
 | `revision` | `integer` | NOT NULL, default 1 |
-| `status` | `character varying(20)` | NOT NULL, default 'ACCEPTED' |
+| `status` | `character varying(20)` | NOT NULL, default 'CREATED', On-file marker for the scope line: CREATED (counts toward contract math when the project baseline is approved) / DRAFT. NEVER implies customer acceptance - that is projects.baseline_status. |
 | `valid_until` | `date` |  |
 | `sent_at` | `timestamp with time zone` |  |
-- FK: `project_id` → `projects(id)` (ON DELETE CASCADE)
+- FK: `project_id` → `projects(id)`
+- PK constraint `estimates_pkey`
 - index `idx_estimates_project`
 
-*created in 0001_init; extended in 0010_quote_trail*
+*created in 0001_init, 0010_quote_trail*
 
 ### change_orders
 
 | Column | Type | Flags / default |
 |--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
 | `project_id` | `uuid` |  |
 | `change_order_number` | `integer` | NOT NULL |
 | `description` | `text` | NOT NULL |
@@ -261,19 +176,126 @@
 | `approved_by` | `character varying(50)` |  |
 | `signer_name` | `character varying(255)` |  |
 | `reason` | `character varying(50)` |  |
-- FK: `project_id` → `projects(id)` (ON DELETE CASCADE)
-- UNIQUE constraint `change_orders_tool_call_id_key` (`tool_call_id`)
+- FK: `project_id` → `projects(id)`
+- UNIQUE constraint `change_orders_tool_call_id_key` (tool_call_id)
+- PK constraint `change_orders_pkey`
 - index `idx_change_orders_project`
 
-*created in 0001_init; extended in 0005_customer_approval, 0006_signer_name, 0010_quote_trail*
+*created in 0001_init, 0005_customer_approval, 0006_signer_name, 0010_quote_trail*
 
-## Schedule & devices
+### approval_log
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `company_id` | `smallint` | NOT NULL |
+| `project_id` | `uuid` | NOT NULL |
+| `kind` | `text` | NOT NULL |
+| `recipient` | `text` |  |
+| `message_id` | `text` |  |
+| `note` | `text` |  |
+| `created_at` | `timestamp with time zone` | NOT NULL, default now() |
+- FK: `company_id` → `company_profile(id)`
+- FK: `project_id` → `projects(id)`
+- PK constraint `approval_log_pkey`
+- index `idx_approval_log_project`
+
+*created in 0029_approval_log*
+
+## Workers & payroll
+
+### workers
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `worker_code` | `character varying(20)` |  |
+| `name` | `character varying(255)` | NOT NULL |
+| `trade` | `character varying(100)` |  |
+| `hourly_rate` | `numeric(10,2)` | NOT NULL, default 0.00 |
+| `overtime_rate` | `numeric(10,2)` |  |
+| `active` | `boolean` | NOT NULL, default true |
+| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
+| `company_id` | `smallint` | NOT NULL, default 1 |
+- FK: `company_id` → `company_profile(id)`
+- PK constraint `workers_pkey`
+- index `idx_workers_active`
+- index `idx_workers_company`
+- index `uq_workers_company_worker_code`
+
+*created in 0001_init, 0019_tenant_columns*
+
+### payroll_runs
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `period_start` | `date` | NOT NULL |
+| `period_end` | `date` | NOT NULL |
+| `status` | `character varying(20)` | NOT NULL, default 'DRAFT' |
+| `notes` | `text` |  |
+| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
+| `company_id` | `smallint` | NOT NULL, default 1 |
+- FK: `company_id` → `company_profile(id)`
+- PK constraint `payroll_runs_pkey`
+- index `idx_payroll_runs_company`
+- index `uq_payroll_runs_company_period`
+
+*created in 0008_workers_payroll, 0019_tenant_columns*
+
+### payroll_entries
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `payroll_run_id` | `uuid` | NOT NULL |
+| `worker_id` | `uuid` | NOT NULL |
+| `regular_hours` | `numeric(8,2)` | NOT NULL, default 0.00 |
+| `overtime_hours` | `numeric(8,2)` | NOT NULL, default 0.00 |
+| `hourly_rate` | `numeric(10,2)` | NOT NULL |
+| `gross_pay` | `numeric(12,2)` | NOT NULL, default 0.00 |
+| `cpp` | `numeric(12,2)` | NOT NULL, default 0.00 |
+| `ei` | `numeric(12,2)` | NOT NULL, default 0.00 |
+| `wcb` | `numeric(12,2)` | NOT NULL, default 0.00 |
+| `net_pay` | `numeric(12,2)` | NOT NULL, default 0.00 |
+| `hours_by_project` | `jsonb` |  |
+| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
+- FK: `payroll_run_id` → `payroll_runs(id)`
+- FK: `worker_id` → `workers(id)`
+- UNIQUE constraint `payroll_entries_payroll_run_id_worker_id_key` (payroll_run_id, worker_id)
+- PK constraint `payroll_entries_pkey`
+- index `idx_payroll_entries_run`
+- index `idx_payroll_entries_worker`
+
+*created in 0008_workers_payroll*
+
+### timesheets
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `project_id` | `uuid` |  |
+| `worker_id` | `uuid` | NOT NULL |
+| `hours_worked` | `numeric(5,2)` | NOT NULL |
+| `work_description` | `text` |  |
+| `date_worked` | `date` | NOT NULL, default CURRENT_DATE |
+| `tool_call_id` | `character varying(100)` |  |
+| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
+| `overtime_hours` | `numeric(5,2)` | NOT NULL, default 0.00 |
+- FK: `project_id` → `projects(id)`
+- FK: `worker_id` → `workers(id)`
+- UNIQUE constraint `timesheets_tool_call_id_key` (tool_call_id)
+- PK constraint `timesheets_pkey`
+- index `idx_timesheets_project`
+- index `idx_timesheets_worker`
+
+*created in 0001_init, 0008_workers_payroll*
 
 ### schedule_items
 
 | Column | Type | Flags / default |
 |--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
 | `project_id` | `uuid` |  |
 | `type` | `character varying(50)` | NOT NULL |
 | `title` | `character varying(255)` | NOT NULL |
@@ -287,125 +309,132 @@
 | `reminder_sent_at` | `timestamp with time zone` |  |
 | `completed_at` | `timestamp with time zone` |  |
 | `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
-| `company_id` | `smallint` | NOT NULL, default 1, tenant |
-- FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
-- FK: `project_id` → `projects(id)` (ON DELETE CASCADE)
+| `company_id` | `smallint` | NOT NULL, default 1 |
+- FK: `company_id` → `company_profile(id)`
+- FK: `project_id` → `projects(id)`
+- PK constraint `schedule_items_pkey`
 - index `idx_schedule_items_company`
 - index `idx_schedule_items_due`
 - index `idx_schedule_items_project`
 
-*created in 0014_schedule; extended in 0019_tenant_columns*
+*created in 0014_schedule, 0019_tenant_columns*
+
+## Invoicing & payments
+
+### invoices
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `project_id` | `uuid` |  |
+| `invoice_number` | `character varying(100)` | NOT NULL |
+| `invoice_type` | `character varying(50)` | NOT NULL |
+| `amount_due` | `numeric(12,2)` | NOT NULL |
+| `holdback_amount` | `numeric(12,2)` | default 0.00 |
+| `status` | `character varying(50)` | default 'UNPAID' |
+| `issued_date` | `date` | default CURRENT_DATE |
+| `due_date` | `date` | NOT NULL |
+| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
+| `net_amount` | `numeric(12,2)` | NOT NULL |
+| `gst_amount` | `numeric(12,2)` | NOT NULL, default 0.00 |
+| `pst_amount` | `numeric(12,2)` | NOT NULL, default 0.00 |
+| `pst_applicable` | `boolean` | NOT NULL, default false |
+| `email_sent_at` | `timestamp with time zone` |  |
+| `company_id` | `smallint` | NOT NULL, default 1 |
+| `description` | `text` |  |
+| `last_client_html` | `text` | Canonical client HTML stored at preview time; approve workflow emails this copy |
+| `billing_percentage` | `numeric(6,2)` | Snapshot: percent of revised contract value billed at creation |
+| `billed_basis` | `numeric(12,2)` | Snapshot: revised contract value the invoice percentage was applied to |
+- FK: `company_id` → `company_profile(id)`
+- FK: `project_id` → `projects(id)`
+- PK constraint `invoices_pkey`
+- index `idx_invoices_company`
+- index `idx_invoices_project`
+- index `uq_invoices_company_invoice_number`
+
+*created in 0001_init, 0009_tax_payments, 0018_invoice_send, 0019_tenant_columns, 0021_invoice_fixes, 0023_invoice_presentation*
+
+### invoice_line_items
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `invoice_id` | `uuid` |  |
+| `source_type` | `character varying(50)` | NOT NULL |
+| `source_id` | `uuid` |  |
+| `description` | `text` | NOT NULL |
+| `amount` | `numeric(12,2)` | NOT NULL |
+| `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
+- FK: `invoice_id` → `invoices(id)`
+- PK constraint `invoice_line_items_pkey`
+- index `idx_invoice_line_items_invoice`
+- index `uq_invoice_line_items_source`
+
+*created in 0001_init, 0027_invoice_line_items_created_at*
+
+### invoice_email_log
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `invoice_id` | `uuid` | NOT NULL |
+| `company_id` | `smallint` | NOT NULL, default 1 |
+| `kind` | `character varying(20)` | NOT NULL |
+| `recipient` | `character varying(255)` |  |
+| `message_id` | `character varying(255)` |  |
+| `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
+- FK: `company_id` → `company_profile(id)`
+- FK: `invoice_id` → `invoices(id)`
+- PK constraint `invoice_email_log_pkey`
+- index `idx_invoice_email_log_company`
+- index `idx_invoice_email_log_invoice`
+
+*created in 0021_invoice_fixes*
+
+### payments
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `invoice_id` | `uuid` | NOT NULL |
+| `payment_date` | `date` | NOT NULL, default CURRENT_DATE |
+| `amount` | `numeric(12,2)` | NOT NULL |
+| `method` | `character varying(50)` |  |
+| `notes` | `text` |  |
+| `tool_call_id` | `character varying(100)` |  |
+| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
+- FK: `invoice_id` → `invoices(id)`
+- UNIQUE constraint `payments_tool_call_id_key` (tool_call_id)
+- PK constraint `payments_pkey`
+- CHECK: CHECK ((amount > (0)::numeric))
+- index `idx_payments_invoice`
+
+*created in 0009_tax_payments*
+
+## App & device
 
 ### device_tokens
 
 | Column | Type | Flags / default |
 |--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
 | `token` | `character varying(512)` | NOT NULL |
 | `platform` | `character varying(20)` | NOT NULL, default 'android' |
 | `device_name` | `character varying(255)` |  |
 | `last_seen_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
 | `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
-| `company_id` | `smallint` | NOT NULL, default 1, tenant |
-- FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
-- UNIQUE constraint `device_tokens_token_key` (`token`)
+| `company_id` | `smallint` | NOT NULL, default 1 |
+- FK: `company_id` → `company_profile(id)`
+- UNIQUE constraint `device_tokens_token_key` (token)
+- PK constraint `device_tokens_pkey`
 - index `idx_device_tokens_company`
 - index `idx_device_tokens_platform`
 
-*created in 0015_device_tokens; extended in 0019_tenant_columns*
-
-## Workers & payroll
-
-### workers
-
-| Column | Type | Flags / default |
-|--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
-| `worker_code` | `character varying(20)` |  |
-| `name` | `character varying(255)` | NOT NULL |
-| `trade` | `character varying(100)` |  |
-| `hourly_rate` | `numeric(10,2)` | NOT NULL, default 0.00 |
-| `overtime_rate` | `numeric(10,2)` |  |
-| `active` | `boolean` | NOT NULL, default true |
-| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
-| `company_id` | `smallint` | NOT NULL, default 1, tenant |
-- FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
-- index `idx_workers_active`
-- index `idx_workers_company`
-- UNIQUE index `uq_workers_company_worker_code` (per-company unique; Step 2)
-
-*created in 0001_init; extended in 0019_tenant_columns*
-
-### timesheets
-
-| Column | Type | Flags / default |
-|--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
-| `project_id` | `uuid` |  |
-| `worker_id` | `uuid` | NOT NULL |
-| `hours_worked` | `numeric(5,2)` | NOT NULL |
-| `work_description` | `text` |  |
-| `date_worked` | `date` | NOT NULL, default CURRENT_DATE |
-| `tool_call_id` | `character varying(100)` |  |
-| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
-| `overtime_hours` | `numeric(5,2)` | NOT NULL, default 0.00 |
-- FK: `project_id` → `projects(id)` (ON DELETE CASCADE)
-- FK: `worker_id` → `workers(id)` (ON DELETE RESTRICT)
-- UNIQUE constraint `timesheets_tool_call_id_key` (`tool_call_id`)
-- index `idx_timesheets_project`
-- index `idx_timesheets_worker`
-
-*created in 0001_init; extended in 0008_workers_payroll*
-
-### payroll_runs
-
-| Column | Type | Flags / default |
-|--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
-| `period_start` | `date` | NOT NULL |
-| `period_end` | `date` | NOT NULL |
-| `status` | `character varying(20)` | NOT NULL, default 'DRAFT' |
-| `notes` | `text` |  |
-| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
-| `company_id` | `smallint` | NOT NULL, default 1, tenant |
-- FK: `company_id` → `company_profile(id)` (ON DELETE NO ACTION)
-- index `idx_payroll_runs_company`
-- UNIQUE index `uq_payroll_runs_company_period` (per-company unique; Step 2)
-
-*created in 0008_workers_payroll; extended in 0019_tenant_columns*
-
-### payroll_entries
-
-| Column | Type | Flags / default |
-|--------|------|-----------------|
-| `id` | `uuid` | PK, NOT NULL, default uuid_generate_v4() |
-| `payroll_run_id` | `uuid` | NOT NULL |
-| `worker_id` | `uuid` | NOT NULL |
-| `regular_hours` | `numeric(8,2)` | NOT NULL, default 0.00 |
-| `overtime_hours` | `numeric(8,2)` | NOT NULL, default 0.00 |
-| `hourly_rate` | `numeric(10,2)` | NOT NULL |
-| `gross_pay` | `numeric(12,2)` | NOT NULL, default 0.00 |
-| `cpp` | `numeric(12,2)` | NOT NULL, default 0.00 |
-| `ei` | `numeric(12,2)` | NOT NULL, default 0.00 |
-| `wcb` | `numeric(12,2)` | NOT NULL, default 0.00 |
-| `net_pay` | `numeric(12,2)` | NOT NULL, default 0.00 |
-| `hours_by_project` | `jsonb` |  |
-| `created_at` | `timestamp with time zone` | default CURRENT_TIMESTAMP |
-- FK: `payroll_run_id` → `payroll_runs(id)` (ON DELETE CASCADE)
-- FK: `worker_id` → `workers(id)` (ON DELETE NO ACTION)
-- UNIQUE constraint `payroll_entries_payroll_run_id_worker_id_key` (`payroll_run_id`, `worker_id`)
-- index `idx_payroll_entries_run`
-- index `idx_payroll_entries_worker`
-
-*created in 0008_workers_payroll*
+*created in 0015_device_tokens, 0019_tenant_columns*
 
 ## Views
 
 ### view_invoice_payments
-
-Columns: `invoice_id`, `project_id`, `total_paid`, `balance_due`, `due_date`
-
-*created in 0009_tax_payments*
 
 ```sql
 SELECT i.id AS invoice_id,
@@ -419,10 +448,6 @@ SELECT i.id AS invoice_id,
 ```
 
 ### view_overdue_invoices
-
-Columns: `invoice_number`, `project_id`, `project_name`, `customer_name`, `customer_email`, `amount_due`, `total_paid`, `balance_due`, `due_date`, `status`, `bucket`
-
-*created in 0011_dashboard_views*
 
 ```sql
 SELECT i.invoice_number,
@@ -449,10 +474,6 @@ SELECT i.invoice_number,
 
 ### view_payroll_summary
 
-Columns: `run_id`, `period_start`, `period_end`, `status`, `workers`, `regular_hours`, `overtime_hours`, `gross_pay`, `deductions`, `net_pay`
-
-*created in 0011_dashboard_views*
-
 ```sql
 SELECT r.id AS run_id,
     r.period_start,
@@ -470,10 +491,6 @@ SELECT r.id AS run_id,
 ```
 
 ### view_project_financial_summary
-
-Columns: `project_id`, `project_name`, `project_status`, `customer_id`, `customer_name`, `customer_email`, `original_contract_value`, `approved_change_orders_total`, `total_revised_contract_value`, `total_invoiced`, `total_paid`, `balance_remaining`, `remaining_unbilled_contract`, `retention_held`, `overdue_amount`, `total_labor_hours`, `total_labor_cost`, `gross_margin`
-
-*created in 0001_init*
 
 ```sql
 SELECT p.id AS project_id,
@@ -530,10 +547,6 @@ SELECT p.id AS project_id,
 
 ### view_quote_followups
 
-Columns: `id`, `project_id`, `project_name`, `customer_name`, `customer_email`, `scope_description`, `revision`, `valid_until`, `amount`
-
-*created in 0011_dashboard_views*
-
 ```sql
 SELECT e.id,
     e.project_id,
@@ -551,10 +564,6 @@ SELECT e.id,
 ```
 
 ### view_schedule
-
-Columns: `project_id`, `project_name`, `type`, `title`, `due_date`, `due_time`, `status`, `priority`
-
-*created in 0014_schedule*
 
 ```sql
 SELECT si.project_id,
@@ -623,29 +632,16 @@ UNION ALL
 
 ## Functions
 
-- `fn_refresh_invoice_statuses()` → `integer`  (created in 0021_invoice_fixes)
-- `fn_run_payroll(p_end date, p_days integer)` → `TABLE(run_id uuid, period_start date, period_end date, status character varying, workers bigint, regular_hours numeric, overtime_hours numeric, gross_pay numeric, deductions numeric, net_pay numeric)`  (created in 0008_workers_payroll)
-- `recompute_invoice_status(invoice_uuid uuid)` → `void`  (created in 0009_tax_payments)
-- `uuid_generate_v1()` → `uuid`  (created in ?)
-- `uuid_generate_v1mc()` → `uuid`  (created in ?)
-- `uuid_generate_v3(namespace uuid, name text)` → `uuid`  (created in ?)
-- `uuid_generate_v4()` → `uuid`  (created in ?)
-- `uuid_generate_v5(namespace uuid, name text)` → `uuid`  (created in ?)
-- `uuid_nil()` → `uuid`  (created in ?)
-- `uuid_ns_dns()` → `uuid`  (created in ?)
-- `uuid_ns_oid()` → `uuid`  (created in ?)
-- `uuid_ns_url()` → `uuid`  (created in ?)
-- `uuid_ns_x500()` → `uuid`  (created in ?)
+- `fn_refresh_invoice_statuses()` → `integer`
+- `fn_run_payroll(p_end date, p_days integer)` → `TABLE(run_id uuid, period_start date, period_end date, status character varying, workers bigint, regular_hours numeric, overtime_hours numeric, gross_pay numeric, deductions numeric, net_pay numeric)`
+- `recompute_invoice_status(invoice_uuid uuid)` → `void`
 
 ## Sequences
 
 - `company_profile_id_seq`
 
-## Un-grouped tables: invoice_email_log
-
 ## Appendix — how to regenerate
 
-1. Extract the catalog: run the extraction SQL in this repo's history (`/tmp` copy lives with the generator) against the live DB via
-   `ssh ubuntu@n8n2.ordrnow.com` → `sudo docker exec -i n8n-compose-postgres-1 psql -U postgres -d postgres -tA -q -v ON_ERROR_STOP=1` (stdin). Sections: TABLES / COLUMNS / CONSTRAINTS / INDEXES / VIEWS / FUNCTIONS / SEQUENCES, each a JSON array on `==NAME==` markers.
-2. Regenerate this file (markdown assembly + migration provenance from `db/*.sql`).
+1. Extract the catalog: `ssh ubuntu@n8n2.ordrnow.com` → `sudo docker exec -i n8n-compose-postgres-1 psql -U postgres -d postgres -tA -q -v ON_ERROR_STOP=1` < `qa/schema_extract.sql` (stdin). Sections: TABLES / COLUMNS / CONSTRAINTS / INDEXES / VIEWS / FUNCTIONS / SEQUENCES, each a JSON array on `==NAME==` markers.
+2. Regenerate this file: `python3 qa/schema_regen.py /tmp/schema_dump.txt > doc/SCHEMA.md` (from the repo root).
 3. Commit: the header date and contents must match the applied migrations.

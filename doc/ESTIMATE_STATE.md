@@ -90,8 +90,10 @@ projects.baseline_status — ONE workflow state for the baseline estimate/contra
 - backend/n8n/workflows/customer-approval-portal.json:
   - Estimate Approval Update SQL: gate PENDING → SENT.
   - Estimate Approval Render + Confirm jsCode vocabulary.
-- backend/n8n/workflows/approval-portal.json — stale pre-audit duplicate (same
-  workflow id lWJJelblgGSpoJUY, 16 vs 19 nodes); delete to stop drift risk.
+- ~~backend/n8n/workflows/approval-portal.json — stale pre-audit duplicate (same
+  workflow id lWJJelblgGSpoJUY, 16 vs 19 nodes); delete to stop drift risk~~ DONE:
+  file removed; README/DEPLOY/SYSTEM_DESIGN refs now point at
+  customer-approval-portal.json.
 - backend/vapi_assistant.json — create_estimate status param default/enum;
   send_estimate_for_approval + get_estimate_approval_link + list_estimate_status
   descriptions (vocabulary + never-create rule); systemPrompt Status Model
@@ -104,15 +106,19 @@ projects.baseline_status — ONE workflow state for the baseline estimate/contra
 
 ## Order + QA gates
 
+All phases DONE (2026-09-08): migrations hermetic + live (9512fda), gateway
+(b5fe795), portal (0538d3a), Vapi (fbf43ab), E2E 12/12 + real-send probe
+(5659205), deployed + marker-verified (10/10), docs below.
+
 1. Migrations → hermetic (zonky scratch full migrate.sh order) → live pg_dump
-   snapshot → apply → verify. Commit.
+   snapshot → apply → verify. Commit. ✅
 2. Gateway JSON mutation → validation gates (parse/unique/connections/switch
    parity/node --check) → SQL hermetic harness (all branches incl. APPROVED
-   block + NONE fallback) → commit.
-3. Portal JSON mutation → same validation → SQL branch probe → commit.
-4. Vapi assistant JSON (tool defs + prompt) → create_vapi_assistant.py → read-back.
-5. E2E script update → L1 live run (9+ checks).
+   block + NONE fallback) → commit. ✅
+3. Portal JSON mutation → same validation → SQL branch probe → commit. ✅
+4. Vapi assistant JSON (tool defs + prompt) → create_vapi_assistant.py → read-back. ✅
+5. E2E script update → L1 live run (12/12) + real-send probe (email→SENT→
+   token rotate→log row with Gmail message id). ✅
 6. Deploy gateway + portal to VPS (scp/import/activate/restart) → export-verify
-   markers → curl probes incl. a real send-flip on a fixture (email swap dance
-   with Dave Miller/support.ordrnow@gmail.com) and a CREATED-gate no-op.
-7. Docs + SCHEMA regen + skill/memory update + final commit/push.
+   markers (10/10 PASS) → curl routing + live probes green. ✅
+7. Docs + SCHEMA regen + skill/memory update + final commit/push. ← this commit

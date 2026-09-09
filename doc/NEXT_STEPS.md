@@ -1,3 +1,23 @@
+## DONE 2026-09-08 — estimate state machine (doc/ESTIMATE_STATE.md, D54–D60)
+projects.baseline_status is now a REAL state machine: CREATED (on file, never
+sent) → SENT (awaiting customer) → APPROVED/REJECTED — state column is the
+truth, approval_log is evidence only. send_estimate_for_approval flips
+CREATED/REJECTED→SENT + rotates the approval token BEFORE rendering (email
+carries the live link) and flips status + logs estimate_sent in ONE atomic
+postgres statement; APPROVED projects never reach the gmail node (spoken
+'already approved by <who> on <date>'). get_estimate_approval_link (on-site
+presentation) transitions CREATED/REJECTED→SENT too. Portal accepts a
+customer decision ONLY from SENT (approving a CREATED project is a guarded
+no-op: no state change, no log, no PM push); unknown/rotated tokens render a
+friendly page. db/0031 remapped live rows by evidence (Test Approval → SENT
+via backfilled 2026-08-26 log row; remaining PENDING → CREATED; estimate-line
+ACCEPTED → CREATED, default CREATED) + 0032 self-rolling verify; SCHEMA.md
+regenerated to 0031. Vapi 29 tools: system prompt gained a Status Model
+section; create_estimate status enum CREATED/DRAFT; tool descriptions
+state-aware. E2E reworked to the SENT gate — 12/12 green live; real send
+probe verified email→SENT+token-rotate+log. Deployed live (gateway + portal
+imports, marker-verified).
+
 ## DONE 2026-09-07/08 — read-status tools + invoice totals (D51-D53)
 list_invoices replies now lead with a COMPUTED total + count ('3 invoices
 totaling $41,475: ...') — arithmetic is done in the code node, never trusted

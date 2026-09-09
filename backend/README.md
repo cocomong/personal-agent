@@ -83,7 +83,7 @@ The mobile `AgentScreen` / `VapiSessionController` (in `mobile/`) drives voice +
 
 ## 2. Customer Approval Portal
 
-A second workflow (`n8n/workflows/approval-portal.json`) hosts the **customer-facing** approval pages. It is separate from the voice gateway because the customer's browser hits it directly (not Vapi).
+A second workflow (`n8n/workflows/customer-approval-portal.json`) hosts the **customer-facing** approval pages. It is separate from the voice gateway because the customer's browser hits it directly (not Vapi).
 
 | Endpoint | Method | Action |
 |---|---|---|

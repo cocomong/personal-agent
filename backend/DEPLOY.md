@@ -91,7 +91,7 @@ PUBLIC_BASE_URL=https://n8n2.ordrnow.com
 n8n → **Workflows → Import from File** (or drag the JSON onto the canvas):
 
 1. `backend/n8n/workflows/voice-gateway.json` — Vapi tool-call router (17 tools)
-2. `backend/n8n/workflows/approval-portal.json` — customer approval pages
+2. `backend/n8n/workflows/customer-approval-portal.json` — customer approval pages
 3. `backend/n8n/workflows/daily-overdue-check.json` — daily 08:00 overdue summary (silent when clear)
 4. `backend/n8n/workflows/daily-quote-followup.json` — daily 09:00 expired-quote chase
 5. `backend/n8n/workflows/monthly-payroll-digest.json` — monthly (1st) payroll draft digest

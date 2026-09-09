@@ -553,7 +553,7 @@ flowchart TD
 
 ### Customer approval portal (ADR-10)
 
-A second workflow, `backend/n8n/workflows/approval-portal.json`, hosts the **customer-facing** approval pages and actions (not reached by Vapi — reached by the customer's browser):
+A second workflow, `backend/n8n/workflows/customer-approval-portal.json`, hosts the **customer-facing** approval pages and actions (not reached by Vapi — reached by the customer's browser):
 
 | Endpoint | Method | Purpose |
 |---|---|---|
@@ -775,7 +775,7 @@ Because ElevenLabs is used only as Vapi's **voice/TTS provider** (`provider: '11
 
 ### ADR-10 — Customer-gated approval with tokenized pages (new)
 - **Context:** The baseline estimate and change orders are legal amendments; `revised_contract_value` must move only when the **customer** signs, not when the PM asserts consent.
-- **Decision:** Tokenized approval pages (`approval-portal.json`) let the customer sign on the spot via a link (and later email/portal). Approvals record `approved_by`/`approval_method`/`signer_name`; `revised_contract_value` recomputes only on customer approval, and `create_change_order` is gated on `baseline_status = 'APPROVED'`.
+- **Decision:** Tokenized approval pages (`customer-approval-portal.json`) let the customer sign on the spot via a link (and later email/portal). Approvals record `approved_by`/`approval_method`/`signer_name`; `revised_contract_value` recomputes only on customer approval, and `create_change_order` is gated on `baseline_status = 'APPROVED'`.
 
 ---
 

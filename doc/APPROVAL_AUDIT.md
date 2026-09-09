@@ -74,3 +74,12 @@ it (removing the separate "send for approval" step). Guardrails agreed:
 hold when the customer has no email; send only on an explicit PM finalize
 (never on draft tweaks); refresh the approval token/link on re-send after a
 rejection or revision.
+
+## UPDATE 2026-09-08 — the state machine got BUILT (doc/ESTIMATE_STATE.md, D54-D60)
+
+The "full version" of the above discussion is now live, closing the deferred
+"refresh token on re-send" guardrail and more: baseline_status is CREATED →
+SENT → APPROVED/REJECTED (db/0031), the email-send and link tools transition
+to SENT and rotate the token, the portal accepts decisions only from SENT,
+and the system prompt teaches the LLM that state is truth while approval_log
+is evidence. See doc/ESTIMATE_STATE.md + doc/NEXT_STEPS.md top entry.
