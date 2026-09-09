@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E2E: create customer -> project -> estimate -> customer approves -> contract updated.
+"""E2E: create customer -> project -> estimate -> SENT -> customer approves -> contract updated.
 
 Reproduces, end to end against the LIVE server, the flow the PM runs from the
 app/chat (and the flow that broke 2026-09-07 with the doubled webhook path):
@@ -7,10 +7,16 @@ tool calls go through the real gateway (/webhook/voice/gateway) exactly as
 Vapi would send them; the approval page + Approve POST go through the real
 Customer Approval Portal. No LLM is involved (deterministic, no Vapi credits).
 
+State machine under test (db/0031): a project is CREATED at birth, must reach
+SENT before the portal accepts a customer decision, and is APPROVED/REJECTED
+thereafter. The portal must refuse a decision from CREATED (no state change,
+no log). The send-for-approval EMAIL step is a separate smoke layer (see
+doc/TEST_PLAN.md) - this harness simulates its DB effect by flipping the
+fixture to SENT via SQL, so nothing is emailed.
+
 Side effects: creates one throwaway customer/project/estimate, approves it
-for real, then deletes the customer (cascades project+estimate). Nothing is
-emailed (the send-for-approval email step is a separate smoke layer — see
-doc/TEST_PLAN.md). Needs network to the VPS + passwordless ssh.
+for real, then deletes the customer (cascades project+estimate). Needs
+network to the VPS + passwordless ssh.
 
 Usage:
   qa/e2e_estimate_approval.py [--base https://n8n2.ordrnow.com] [--ssh ubuntu@n8n2.ordrnow.com] [--keep]
@@ -110,13 +116,36 @@ def main():
         if not token:
             sql(ssh, f"UPDATE projects SET baseline_approval_token = md5(random()::text) || md5(clock_timestamp()::text) WHERE title = '{proj}';")
             token = sql(ssh, f"SELECT baseline_approval_token FROM projects WHERE title = '{proj}';")
-        assert status == "PENDING", f"expected PENDING, got {status}"
-        step("project holds a PENDING approval token", lambda: None)
+        assert status == "CREATED", f"expected CREATED, got {status}"
+        step("project starts CREATED with an approval token", lambda: None)
+
+        # CREATED gate: the portal page must NOT offer a decision, and a POST
+        # must be a no-op (0 rows -> no state change, no log, no PM notice).
+        st, page = http_get(f"{base}/webhook/approve-estimate?token={token}")
+        assert st == 200 and proj in page and "not been sent for approval" in page \
+            and "name='decision'" not in page, f"CREATED approve page status {st}: {page[:300]}"
+        step("GET approve-estimate on CREATED -> 'not sent yet', no Approve button", lambda: None)
+
+        st, _ = http_post(f"{base}/webhook/estimate/approval",
+                          {"token": token, "decision": "approve",
+                           "approval_method": "onsite_link", "signer_name": "QA Robot"})
+        bs0 = sql(ssh, f"SELECT baseline_status FROM projects WHERE title = '{proj}';")
+        log0 = sql(ssh, f"SELECT count(*) FROM approval_log al JOIN projects p ON p.id = al.project_id WHERE p.title = '{proj}';")
+        assert st == 200 and bs0 == "CREATED" and log0 == "0", \
+            f"CREATED-gate no-op violated: {st}/{bs0}/log={log0}"
+        step("POST approve on CREATED is a guarded no-op (no state change, no log)", lambda: None)
+
+        # Send step (email path is its own smoke layer): flip to SENT exactly
+        # as send_estimate_for_approval's atomic flip+log would.
+        sql(ssh, f"UPDATE projects SET baseline_status = 'SENT' WHERE title = '{proj}';")
+        status = sql(ssh, f"SELECT baseline_status FROM projects WHERE title = '{proj}';")
+        assert status == "SENT", f"send-flip failed: {status}"
+        step("send step flips fixture to SENT (simulated)", lambda: None)
 
         st, page = http_get(f"{base}/webhook/approve-estimate?token={token}")
         assert st == 200 and proj in page and "Approve" in page and "$105,000" in page, \
             f"approve page status {st}"
-        step("GET approve-estimate page renders lines + Approve", lambda: None)
+        step("GET approve-estimate on SENT renders lines + Approve", lambda: None)
 
         st, conf = http_post(f"{base}/webhook/estimate/approval",
                              {"token": token, "decision": "approve",
@@ -140,7 +169,8 @@ def main():
         assert "QA Robot" in parts[1] and "push suppressed" in parts[1], f"log note: {parts[1]}"
         step("approval_log records the decision (push suppressed for QA signer)", lambda: None)
 
-        # Re-approving the same token must be a no-op (PENDING guard).
+        # Re-approving the same token must be a no-op (SENT-only gate: the
+        # project is already APPROVED, so the UPDATE matches 0 rows).
         st2, _ = http_post(f"{base}/webhook/estimate/approval",
                            {"token": token, "decision": "approve",
                             "approval_method": "onsite_link", "signer_name": "QA Robot"})
