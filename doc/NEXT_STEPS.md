@@ -1,3 +1,29 @@
+## DONE 2026-09-10 — tool-routing fix: 4 tools were silently dead
+`find_customer`, `list_estimate_status`, `send_invoice_to_phone` and
+`send_payment_receipt` (all added 2026-09-06..08) shipped WITHOUT their own
+`server.url` in backend/vapi_assistant.json. A tool without one inherits the
+ASSISTANT-level serverUrl, which points at the call-start hook endpoint
+(`/webhook/vapi/assistant-hook`) — not the gateway. Every call to those four
+404'd, Vapi substituted its "No result returned … troubleshooting tips"
+boilerplate as the tool output, and NO n8n execution row was created (so the
+incident read like a Vapi-side blip from the executions view). The model then
+treated the failure text as a not-found: chat fd8539b8 asked "how is 5650
+Camino", the model called find_customer (a CUSTOMER tool) for a PROJECT
+question, and answered "I could not find any customer or project matching
+5650 Camino" while the project sat APPROVED in the DB.
+Fixed: `server` blocks (gateway URL, timeoutSeconds 15) added to all four tools
+→ create_vapi_assistant.py re-run → read-back 29/29 tools routed correctly (new
+`qa/verify_vapi_tools.py`). The deployer now REFUSES to deploy if any tool lacks
+server.url. Prompt gained two TOOL HONESTY RULES: the literal "No result
+returned" string means the CALL FAILED (never conclude absence — retry), and a
+tool result only speaks for what that tool searched (find_customer = customers
+only, never projects). `vapi-assistant-hook-001` was also reactivated — it had
+gone inactive, so voice calls had lost setup/company variable injection (POST
+now returns setup_complete/company_name/pm_preferred_name + greeting again).
+Live probes after deploy: find_customer('5650 Camino') → "No customers found
+matching 5650 Camino …"; list_estimate_status('5650 Camino') → "baseline
+APPROVED approved 2026-09-07 by customer, 1 estimate line totaling $270,000".
+
 ## DONE 2026-09-08 — estimate state machine (doc/ESTIMATE_STATE.md, D54–D60)
 projects.baseline_status is now a REAL state machine: CREATED (on file, never
 sent) → SENT (awaiting customer) → APPROVED/REJECTED — state column is the

@@ -100,6 +100,22 @@ def main() -> None:
     name = payload["name"]
     assert len(tools) >= 24, f"expected >= 24 tools, got {len(tools)}"
 
+    # Guard: a tool without its own server.url inherits the ASSISTANT-level
+    # serverUrl. That is the call-start hook endpoint, not the tool gateway, so
+    # every call to such a tool 404s and Vapi reports "No result returned" -
+    # which reads like a not-found result to the model. Refuse to deploy.
+    missing_server = [
+        t.get("function", {}).get("name", "<unnamed tool>")
+        for t in tools
+        if not (t.get("server") or {}).get("url")
+    ]
+    if missing_server:
+        sys.exit(
+            "error: refusing to deploy - these tools have no server.url and would "
+            "inherit the assistant serverUrl (they would 404 silently): "
+            + ", ".join(missing_server)
+        )
+
     payload.setdefault("transcriber", {})
     payload["transcriber"].setdefault("provider", "deepgram")
 
