@@ -347,16 +347,21 @@ def main() -> int:
                 check(bool(HONESTY.search(reply)), f"{case.name}: says it found nothing, rather than inventing")
 
         # Multi-turn: the app carries the chain through chatId, so context must survive a turn.
+        # Target the project that HAS estimate lines — a follow-up asking "how much was that?"
+        # cannot be answered for a project with none, and a nightly gate must not be flaky about
+        # which project the DB happens to return first.
         print("\n  multi-turn continuity (chatId chain)")
-        first = app_turn(args.root, f"estimate status for {fixtures.get('project') or '5650 Camino'}", None, args.timeout)
+        anchor_project = fixtures.get("estimated_project") or fixtures.get("project") or "5650 Camino"
+        figure_regex = _money_regex(fixtures.get("estimate_total", "")) if fixtures.get("estimate_total") else MONEY.pattern
+        first = app_turn(args.root, f"estimate status for {anchor_project}", None, args.timeout)
         chain_id = first["chat_id"]
         check(bool(chain_id), "multi-turn: a chat id came back", f"chatId={str(chain_id)[:12]}")
         second = app_turn(args.root, "and how much was that again?", chain_id, args.timeout)
         print(f"     Q: and how much was that again?  ->  [{second['status']}] {second['reply'][:200]}")
         check(second["status"] == 200 and bool(second["reply"].strip()),
               "multi-turn: the follow-up answered")
-        check(bool(MONEY.search(second["reply"])),
-              "multi-turn: the follow-up resolved the reference (a figure came back)",
+        check(bool(re.search(figure_regex, second["reply"])),
+              "multi-turn: the follow-up resolved the reference (the same figure came back)",
               f"reply={second['reply'][:120]!r}")
 
     # ---------------------------------------------------------------- layer B: tool truth
