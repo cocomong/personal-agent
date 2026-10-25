@@ -10,7 +10,7 @@ import '../session/vapi_session_controller.dart';
 /// session (VapiSessionController), so the agent keeps context across
 /// speak-or-type turns.
 class AgentScreen extends StatefulWidget {
-  const AgentScreen({super.key, this.onSignOut, this.chat});
+  const AgentScreen({super.key, this.onSignOut, this.chat, this.session});
 
   /// Optional: called when the user taps the sign-out button (auth gate).
   final VoidCallback? onSignOut;
@@ -18,12 +18,17 @@ class AgentScreen extends StatefulWidget {
   /// Optional: inject a ChatController (test seam — widget tests pass a fake).
   final ChatController? chat;
 
+  /// Optional: inject a VapiSessionController (test seam, same pattern as
+  /// [chat]) — widget tests pass one wired to a fake Vapi client.
+  final VapiSessionController? session;
+
   @override
   State<AgentScreen> createState() => _AgentScreenState();
 }
 
 class _AgentScreenState extends State<AgentScreen> {
-  final VapiSessionController _session = VapiSessionController();
+  late final VapiSessionController _session =
+      widget.session ?? VapiSessionController();
   late final ChatController _chat = widget.chat ?? ChatController();
   final _transcript = <TranscriptEntry>[];
   final _draftController = TextEditingController();
@@ -66,6 +71,11 @@ class _AgentScreenState extends State<AgentScreen> {
   Future<void> _toggleVoice() async {
     if (_session.isConnected) {
       await _session.stop();
+      return;
+    }
+    if (_session.status == SessionStatus.connecting) {
+      // A start is already in flight (the controller guard holds); a second
+      // tap must do nothing, not queue another assistant.
       return;
     }
     await _session.start();
@@ -137,6 +147,7 @@ class _AgentScreenState extends State<AgentScreen> {
 
   Widget _buildVoiceButton() {
     final connected = _session.isConnected;
+    final connecting = _session.status == SessionStatus.connecting;
     return SizedBox(
       width: double.infinity,
       child: FilledButton(
@@ -144,8 +155,11 @@ class _AgentScreenState extends State<AgentScreen> {
           backgroundColor: connected ? const Color(0xFFDC2626) : const Color(0xFF2563EB),
           padding: const EdgeInsets.symmetric(vertical: 16),
         ),
-        onPressed: _toggleVoice,
-        child: Text(connected ? 'End Voice' : 'Start Voice',
+        // Disabled while connecting so a second tap can't even queue up;
+        // the controller's single-flight guard is the real defense, this is
+        // defense in depth.
+        onPressed: connecting ? null : _toggleVoice,
+        child: Text(connecting ? 'Connecting…' : connected ? 'End Voice' : 'Start Voice',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
       ),
     );

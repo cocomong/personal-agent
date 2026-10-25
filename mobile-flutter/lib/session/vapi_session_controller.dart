@@ -11,17 +11,51 @@ import '../config.dart';
 /// Call session state surfaced to the UI.
 enum SessionStatus { disconnected, connecting, connected }
 
+/// Builds the Vapi client the controller talks to. Test seam: production
+/// leaves this null and [VapiSessionController.init] creates the real SDK
+/// client; tests inject a fake so no platform channel is ever touched.
+typedef VapiClientFactory = VapiClientInterface Function();
+
+/// Fetches the per-call assistant overrides. Test seam: production leaves
+/// this null and the n8n call-start hook is used.
+typedef OverridesFetcher = Future<Map<String, dynamic>> Function();
+
 /// Wraps the Vapi Flutter SDK (`VapiClient` / `VapiCall`) for a single
 /// voice + same-session text call (ADR-8 / ADR-9).
 ///
 /// `start` drives voice; `sendUserText` injects a typed turn on the SAME call
 /// so the agent keeps context across speak-or-type. ElevenLabs is the voice
 /// engine (assistant `voice.provider='11labs'`).
+///
+/// Concurrency contract (added after the double-tap bug seen on a slow
+/// phone, where two rapid taps made two assistants talk over each other):
+/// - `start` is single-flight: a second `start` while one is still
+///   connecting joins the in-flight attempt instead of creating a second
+///   concurrent call.
+/// - `stop` during a connecting `start` supersedes it: when the SDK call
+///   completes afterwards it is torn down immediately, never orphaned.
 class VapiSessionController extends ChangeNotifier {
-  VapiClient? _client;
+  VapiSessionController({
+    VapiClientFactory? clientFactory,
+    OverridesFetcher? overridesFetcher,
+  })  : _clientFactory = clientFactory,
+        _overridesFetcher = overridesFetcher;
+
+  final VapiClientFactory? _clientFactory;
+  final OverridesFetcher? _overridesFetcher;
+
+  VapiClientInterface? _client;
   VapiCall? _call;
   StreamSubscription<VapiEvent>? _subscription;
   SessionStatus _status = SessionStatus.disconnected;
+
+  /// The in-flight [start] attempt, if any. Further starts join it.
+  Future<void>? _starting;
+
+  /// Bumped by every [stop] and [dispose]. A [start] snapshots it before its
+  /// network work; if the number has moved by the time the SDK call returns,
+  /// that start was superseded and its call gets torn down.
+  int _stopGeneration = 0;
 
   /// Called when the assistant produces a finalized transcript turn
   /// (spoken or typed) on the shared session.
@@ -32,23 +66,69 @@ class VapiSessionController extends ChangeNotifier {
 
   Future<void> init() async {
     if (_client != null) return;
+    final clientFactory = _clientFactory;
+    if (clientFactory != null) {
+      _client = clientFactory();
+      return;
+    }
     await VapiClient.platformInitialized.future;
     _client = VapiClient(vapiPublicKey);
   }
 
+  /// Starts the voice call. Single-flight: while a previous start is still
+  /// connecting (hook fetch + WebRTC negotiation — seconds on a slow phone),
+  /// further starts await the same future instead of starting more calls,
+  /// so rapid double-taps can no longer create overlapping assistants.
   Future<void> start() async {
+    final starting = _starting;
+    if (starting != null) return starting;
+    return _starting = _start().whenComplete(() => _starting = null);
+  }
+
+  Future<void> _start() async {
     await init();
-    await stop();
+    if (_status != SessionStatus.disconnected) return; // already up/upcoming
+
+    final generation = _stopGeneration;
     _lastAgentText = null; // new session: allow an identical reply again
-    final overrides = await _fetchSessionOverrides();
-    final call = await _client!.start(
-      assistantId: vapiAssistantId,
-      assistantOverrides: overrides,
-    );
+
+    // Clear any call object a 'call-end' event left behind before
+    // reconnecting (call-end flips status but keeps _call set).
+    await _call?.stop();
+    _call = null;
+    await _subscription?.cancel();
+    _subscription = null;
+
+    _status = SessionStatus.connecting; // visible BEFORE the network work
+    notifyListeners();
+
+    final VapiCall call;
+    try {
+      final fetchOverrides = _overridesFetcher ?? _fetchSessionOverrides;
+      final overrides = await fetchOverrides();
+      call = await _client!.start(
+        assistantId: vapiAssistantId,
+        assistantOverrides: overrides,
+      );
+    } catch (_) {
+      if (_stopGeneration == generation) {
+        _status = SessionStatus.disconnected;
+        notifyListeners();
+      }
+      rethrow;
+    }
+
+    if (_stopGeneration != generation) {
+      // A stop (mode switch to text, screen change, dispose) superseded
+      // this start while it was connecting. Tear the fresh call down
+      // instead of leaving a live assistant nobody is listening to.
+      await call.stop();
+      call.dispose();
+      return;
+    }
+
     _call = call;
     _subscription = call.onEvent.listen(_handleEvent);
-    _status = SessionStatus.connecting;
-    notifyListeners();
   }
 
   /// Fetch per-call assistant overrides (setup-status variables + dynamic
@@ -89,6 +169,7 @@ class VapiSessionController extends ChangeNotifier {
   }
 
   Future<void> stop() async {
+    _stopGeneration++; // supersede any start still connecting
     await _call?.stop();
     _call = null;
     await _subscription?.cancel();
@@ -163,10 +244,10 @@ class VapiSessionController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _stopGeneration++; // an in-flight start must self-destruct, not assign
     unawaited(_subscription?.cancel());
     _call?.dispose();
     _client?.dispose();
     super.dispose();
   }
 }
-
