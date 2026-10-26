@@ -10,6 +10,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vapi/vapi.dart';
 // VapiCallMonitor / VapiCallTransport are part of the VapiCall interface but
@@ -208,6 +209,37 @@ void main() {
     await _park();
     expect(controller.status, SessionStatus.connected);
     await controller.stop();
+  });
+
+  test('foreground service starts on call-start and stops on stop', () async {
+    final methods = <String>[];
+    const channel = MethodChannel('personal_agent/voice_call');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      methods.add(call.method);
+      return null;
+    });
+
+    final client = FakeVapiClient();
+    final controller = _controller(client);
+    try {
+      final starting = controller.start();
+      await _park();
+      final call = client.completeStart(0);
+      await starting;
+      expect(methods, isEmpty); // nothing before the call is up
+
+      call.emit('call-start');
+      await _park();
+      expect(methods, contains('start')); // keeps the call alive, screen off
+
+      await controller.stop();
+      expect(methods.last, 'stop');
+    } finally {
+      messenger.setMockMethodCallHandler(channel, null);
+      await controller.stop();
+    }
   });
 
   testWidgets('talk button disables and shows Connecting… while the call comes up',

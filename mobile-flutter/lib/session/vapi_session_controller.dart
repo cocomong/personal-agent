@@ -7,6 +7,7 @@ import 'package:vapi/vapi.dart';
 
 import '../auth/session_store.dart';
 import '../config.dart';
+import 'foreground_call_service.dart';
 
 /// Call session state surfaced to the UI.
 enum SessionStatus { disconnected, connecting, connected }
@@ -170,6 +171,7 @@ class VapiSessionController extends ChangeNotifier {
 
   Future<void> stop() async {
     _stopGeneration++; // supersede any start still connecting
+    unawaited(ForegroundCallService.stop());
     await _call?.stop();
     _call = null;
     await _subscription?.cancel();
@@ -182,10 +184,16 @@ class VapiSessionController extends ChangeNotifier {
     switch (event.label) {
       case 'call-start':
         _status = SessionStatus.connected;
+        // Keep the call alive when the screen turns off (Android Doze would
+        // otherwise suspend the process and drop the WebRTC session). Started
+        // here, after the SDK obtained RECORD_AUDIO — Android 14 requires the
+        // permission before a microphone-type foreground service may start.
+        unawaited(ForegroundCallService.start());
         notifyListeners();
         break;
       case 'call-end':
         _status = SessionStatus.disconnected;
+        unawaited(ForegroundCallService.stop());
         notifyListeners();
         break;
       case 'message':
@@ -245,6 +253,7 @@ class VapiSessionController extends ChangeNotifier {
   @override
   void dispose() {
     _stopGeneration++; // an in-flight start must self-destruct, not assign
+    unawaited(ForegroundCallService.stop());
     unawaited(_subscription?.cancel());
     _call?.dispose();
     _client?.dispose();

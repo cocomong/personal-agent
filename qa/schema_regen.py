@@ -52,9 +52,11 @@ def fmt_default(d):
 
 # provenance: which db/00NN file created/extended each table/column
 provenance = {}
+migration_numbers = []
 for f in sorted(glob.glob('db/*.sql')):
     n = re.search(r"(\d{4})_([a-z0-9_]+)\.sql", f)
     if not n: continue
+    migration_numbers.append(int(n.group(1)))
     tag = f"{n.group(1)}_{n.group(2)}"
     txt = open(f).read()
     for m in re.finditer(r"CREATE TABLE (?:IF NOT EXISTS )?(\w+)", txt):
@@ -84,7 +86,7 @@ def col_row(c):
 out = []
 out.append("# Database Schema — live (generated)")
 out.append("")
-out.append(f"> **Generated {date.today().isoformat()} from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0031 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.")
+out.append(f"> **Generated {date.today().isoformat()} from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–{max(migration_numbers):04d} applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.")
 out.append("")
 out.append("## Conventions")
 out.append("- Every business table PK is `id UUID DEFAULT uuid_generate_v4()` (uuid-ossp).")

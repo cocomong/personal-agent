@@ -1,6 +1,6 @@
 # Database Schema — live (generated)
 
-> **Generated 2026-09-08 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0031 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
+> **Generated 2026-10-25 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0034 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
 
 ## Conventions
 - Every business table PK is `id UUID DEFAULT uuid_generate_v4()` (uuid-ossp).
@@ -128,13 +128,14 @@
 | `scheduled_start` | `date` |  |
 | `target_completion` | `date` |  |
 | `company_id` | `smallint` | NOT NULL, default 1 |
+| `deleted_at` | `timestamp with time zone` | Soft-delete marker: non-NULL = project removed. Hidden from all gateway tools; row and history kept. |
 - FK: `company_id` → `company_profile(id)`
 - FK: `customer_id` → `customers(id)`
 - PK constraint `projects_pkey`
 - index `idx_projects_company`
 - index `idx_projects_customer`
 
-*created in 0001_init, 0005_customer_approval, 0006_signer_name, 0014_schedule, 0019_tenant_columns*
+*created in 0001_init, 0005_customer_approval, 0006_signer_name, 0014_schedule, 0019_tenant_columns, 0033_projects_soft_delete*
 
 ### estimates
 

@@ -1,3 +1,39 @@
+## DONE 2026-10-25 — project soft delete + screen-off voice support
+SOFT DELETE (db/0033 + 0034 verify, live): `projects.deleted_at timestamptz`
+(NULL = active). A removed project keeps its row and every dependent invoice /
+estimate / change order / approval, but disappears from all project-facing
+tools: list_projects, get_project_statement, list_estimate_status,
+create_estimate, create_change_order, create_invoice,
+create_invoice_change_orders, get_*_approval_link, send_*_for_approval_lookup,
+rotate_estimate_token, log_approval_email_*. New tool `remove_project`
+(id a16b20ec…) is TWO-PHASE: confirm=false → outcome NEEDS_CONFIRMATION with
+counts (invoices / estimates / change orders) so the assistant can warn the PM
+before hiding anything; confirm=true → REMOVED. Guaranteed-row SQL (NOT_FOUND /
+NEEDS_CONFIRMATION / REMOVED), never a hard delete. Prompt section "REMOVING
+PROJECTS (SOFT DELETE)" added; repo systemPrompt resynced to the LIVE prompt
+(they had diverged — live was 6066 chars, repo 5338; repo now mirrors live).
+Patch script: backend/n8n/patch_remove_project.py (idempotent; applies the 14
+query filters, the node + router rule, the formatter case, and the
+get_project_statement 0-row guard). Live probes: NOT_FOUND ✓, warning with
+"2 invoices, 1 estimate, 3 change orders" ✓, create→warn→REMOVED→NOT_FOUND ✓,
+list_projects hides it ✓, statement says "Project not found." ✓, create_estimate
+refuses a removed project ✓, rolled-back tx proved deps survive (2 inv / 1 est /
+3 CO still present, active view shows 0). SCHEMA.md regenerated (0001–0034;
+schema_regen.py now derives the range from db/*.sql instead of a hardcoded 0031).
+NOT changed: invoice-centric tools (list_invoices, receipt_lookup,
+invoice_push_lookup, send_customer_invoice_lookup) still show/act on invoices of
+a removed project (they key off the invoice, not the project) — say the word if
+those should hide too. `restore_project` not built (SQL: UPDATE … SET
+deleted_at=NULL) — optional follow-up.
+
+SCREEN-OFF VOICE (app): Android foreground service `VoiceCallService`
+(foregroundServiceType=microphone + PARTIAL_WAKE_LOCK + ongoing notification) +
+manifest permissions (WAKE_LOCK, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MICROPHONE,
+POST_NOTIFICATIONS) + MethodChannel `personal_agent/voice_call` started on
+call-start (after the SDK has RECORD_AUDIO — Android 14 requires it) and stopped
+on stop()/call-end/dispose. Doze was suspending the process when the screen went
+off, dropping the WebRTC session. Needs on-device verification (screen off mid-call).
+
 ## DONE 2026-09-10 — tool-routing fix: 4 tools were silently dead
 `find_customer`, `list_estimate_status`, `send_invoice_to_phone` and
 `send_payment_receipt` (all added 2026-09-06..08) shipped WITHOUT their own

@@ -49,6 +49,7 @@ MIGRATIONS=(
   0027_invoice_line_items_created_at.sql
   0029_approval_log.sql
   0031_estimate_state.sql
+  0033_projects_soft_delete.sql
 )
 
 VERIFY=(
@@ -61,6 +62,7 @@ VERIFY=(
   0028_invoice_line_items_created_at_verify.sql
   0030_approval_log_verify.sql
   0032_estimate_state_verify.sql
+  0034_projects_soft_delete_verify.sql
 )
 
 echo "== Migrations =="
