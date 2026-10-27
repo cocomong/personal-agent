@@ -34,6 +34,55 @@ call-start (after the SDK has RECORD_AUDIO — Android 14 requires it) and stopp
 on stop()/call-end/dispose. Doze was suspending the process when the screen went
 off, dropping the WebRTC session. Needs on-device verification (screen off mid-call).
 
+## DONE 2026-10-26 (overnight) — invoice template CHOICE: BUILT + LOCALLY VERIFIED, awaiting morning deploy
+Status: every repo-side piece is built and verified; the live steps need a
+terminal approval (unattended prompts time out), so they are bundled into ONE
+script: `deploy/deploy_invoice_templates.sh` (pre-dump → db/0037+0038 →
+seed catalog → deploy 3 workflows → Vapi assistant 32 tools + prompt →
+`qa/template_choice_probe.py` E2E → SCHEMA.md regen). Run it in the morning,
+then commit the regenerated SCHEMA.md.
+- CATALOG: 3 layouts, ONE placeholder contract — classic (invoice.html),
+  modern (invoice-modern.html: color-band header, dark table header, totals
+  card), compact (invoice-compact.html: condensed one-pager). Each carries
+  data-tpl markers; mustache_mini.test.js loops all three against the same
+  fixture (logo, GST#/PST# lines, both tax rows, zero-GST row, nothing
+  unrendered).
+- db/0037: document_templates (key UNIQUE, is_active, html) +
+  company_profile.invoice_template_key FK ON DELETE SET NULL (NULL = classic)
+  + 0038 self-rolling-back verify (FK enforcement, upsert-by-key round trip);
+  seed_invoice_templates.py = idempotent upsert, re-run after any template
+  edit.
+- RENDERER v2: the three render nodes render inv.invoice_template_html when
+  the row carries one, else the embedded Classic — rendering never
+  hard-depends on the catalog table. The three lookups LEFT JOIN the
+  company's choice (only active rows).
+- invoice-template-preview.json (id tplPreview-001, built by
+  build_invoice_template_preview.py): GET /webhook/invoice-template-preview
+  (HMAC `${company}.template-preview.${exp}`) renders all three as swipeable
+  scroll-snap cards, each an isolated iframe (srcdoc) with the company's REAL
+  branding + logo on a SAMPLE invoice, each with a tap-to-choose form; POST
+  /webhook/invoice-template-choose (HMAC `${company}.template-choose.${exp}`)
+  validates the key and writes the choice. GET never mutates. Offline harness:
+  test_invoice_template_preview.py — 3 cards/iframes/forms, swipe CSS, good
+  sig accepted, bad + expired rejected, choice pages. (A createHMAC typo in
+  two generated nodes was caught by the harness and fixed — node --check does
+  NOT catch runtime name errors; run the harness too.)
+- TOOLS: list_invoice_templates (catalog + current + pushes the preview to
+  the PM's devices — FCM chain cloned from Push Invoice Review, wrapped in an
+  async run() so node --check stays green) and set_invoice_template
+  (guaranteed-row UPDATED / INVALID_TEMPLATE; 'classic' writes NULL).
+- ONBOARDING: complete_onboarding gains invoice_template ($11) — and its
+  queryReplacement WAS BROKEN (passed only 3 of 10 args to the $1..$10 SQL,
+  so the billing-details capture added 2026-09-05 never actually worked;
+  fixed). get_onboarding_status + both formatter replies mention the style.
+  Prompt section INVOICE STYLES (catalog, offer right after payment details,
+  preview on request, switching rules). vapi_assistant.json now 32 tools, all
+  with server.url.
+- User decisions honored: 3 templates; side-by-side swipeable; tap-to-choose;
+  classic default. Issued invoices keep their stored look. The call-start
+  hook (onboarding_steps) deliberately untouched: the prompt section drives
+  the conversation, the tools carry the state.
+
 ## DONE 2026-10-26 — invoice layout template + embedded company logo
 Invoice rendering is now TEMPLATE-DRIVEN instead of three hand-synced inline
 builders. `backend/templates/invoice.html` (strict Mustache) is the single

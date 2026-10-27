@@ -1,0 +1,145 @@
+<!doctype html>
+<!--
+  COMPACT invoice layout — seeded catalog template, key 'compact'.
+  SAME placeholder contract as invoice.html (classic); only the look differs.
+  Condensed: one-page fit, tighter type, minimal decoration.
+  See invoice.html for the placeholder -> data-source mapping.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice {{invoice_number}} — {{company_name}}</title>
+<style>
+  :root {
+    --brand: {{brand_primary_color}};
+    --ink: #0f172a;
+    --muted: #64748b;
+    --line: #cbd5e1;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+         color: var(--ink); margin: 0; font-size: 13px; }
+  .page { max-width: 720px; margin: 24px auto; padding: 0 36px; }
+
+  header { display: flex; justify-content: space-between; align-items: center;
+           gap: 14px; border-bottom: 2px solid var(--brand);
+           padding: 12px 0 10px; margin-top: 18px; }
+  .co { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo { height: 40px; width: auto; border-radius: 5px; padding: 2px;
+          background: #fff; border: 1px solid var(--line); flex: none; }
+  .name { font-size: 17px; font-weight: 700; color: var(--brand); }
+  .sub  { color: var(--muted); font-size: 11px; line-height: 1.45; }
+  .doc { text-align: right; flex: none; }
+  .doc .label { font-size: 17px; font-weight: 800; letter-spacing: 3px; }
+  .doc .num   { color: var(--brand); font-weight: 600; font-size: 13px; }
+
+  .meta { display: flex; justify-content: space-between; gap: 18px;
+          margin: 14px 0 2px; font-size: 12.5px; }
+  .meta b { color: var(--muted); font-weight: 600; font-size: 10px;
+            text-transform: uppercase; letter-spacing: 1.1px; display: block; margin-bottom: 2px; }
+
+  table.items { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  .items th { text-align: left; font-size: 10px; text-transform: uppercase;
+              letter-spacing: 1.1px; color: var(--muted);
+              border-bottom: 2px solid var(--ink); padding: 5px 8px; }
+  .items th.amt, .items .amt { text-align: right; }
+  .items td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  .items .amt { white-space: nowrap; }
+
+  .totals { margin-left: auto; width: 300px; margin-top: 10px; }
+  .totals .row { display: flex; justify-content: space-between;
+                 padding: 3px 10px; font-size: 12.5px; }
+  .totals .row.grand { border-top: 2px solid var(--brand); margin-top: 5px;
+                       padding-top: 6px; font-weight: 700; font-size: 14px; }
+  .totals .row.holdback { color: var(--muted); font-size: 11.5px; }
+
+  .pay { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 8px;
+         font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+  .pay strong { color: var(--ink); font-size: 10px; text-transform: uppercase;
+                letter-spacing: 1.1px; display: block; margin-bottom: 2px; }
+
+  footer { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 8px;
+           font-size: 10px; color: var(--muted); text-align: center; line-height: 1.5; }
+
+  @media print {
+    .page { margin: 0; max-width: none; padding: 0; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body data-tpl="compact">
+<div class="page">
+
+  <header>
+    <div class="co">
+      {{#logo_data_uri}}
+      <img class="logo" src="{{logo_data_uri}}" alt="{{company_name}} logo">
+      {{/logo_data_uri}}
+      <div>
+        <div class="name">{{company_name}}</div>
+        <div class="sub">{{company_address}} &middot; {{company_phone}}</div>
+        <div class="sub">GST #: {{gst_reg_number}} &middot; PST #: {{pst_reg_number}}</div>
+      </div>
+    </div>
+    <div class="doc">
+      <div class="label">INVOICE</div>
+      <div class="num">{{invoice_number}}</div>
+    </div>
+  </header>
+
+  <div class="meta">
+    <div>
+      <b>Bill To</b>
+      <span style="font-weight:600">{{bill_to_name}}</span>{{#bill_to_address}}<br>
+      {{{bill_to_address}}}{{/bill_to_address}}
+    </div>
+    <div>
+      <b>Project</b>
+      {{project_name}}
+    </div>
+    <div style="text-align:right">
+      <b>Details</b>
+      Issued {{issued_date}}<br>
+      Due {{due_date}}<br>
+      {{invoice_type_label}}
+    </div>
+  </div>
+
+  <table class="items">
+    <tr><th style="width:28px">#</th><th>Description</th><th class="amt">Amount</th></tr>
+    {{#line_items}}
+    <tr><td>{{position}}</td>
+        <td>{{description}}</td>
+        <td class="amt">{{amount}}</td></tr>
+    {{/line_items}}
+  </table>
+
+  <div class="totals">
+    <div class="row"><span>Subtotal</span><span>{{net_amount}}</span></div>
+    <div class="row"><span>{{gst_label}}</span><span>{{gst_amount}}</span></div>
+    {{#pst_amount}}
+    <div class="row"><span>PST</span><span>{{pst_amount}}</span></div>
+    {{/pst_amount}}
+    {{^pst_amount}}
+    <div class="row"><span>PST</span><span>Not applicable</span></div>
+    {{/pst_amount}}
+    <div class="row grand"><span>Total due</span><span>{{amount_due}}</span></div>
+    {{#holdback_amount}}
+    <div class="row holdback"><span>{{holdback_label}}: {{holdback_amount}}</span></div>
+    {{/holdback_amount}}
+  </div>
+
+  {{#payment_instructions}}
+  <div class="pay">
+    <strong>Payment instructions</strong>
+    {{{payment_instructions}}}
+  </div>
+  {{/payment_instructions}}
+
+  <footer>
+    {{company_name}} &bull; {{company_address}} &bull; {{company_phone}} &bull; Thank you for your business.
+  </footer>
+
+</div>
+</body>
+</html>

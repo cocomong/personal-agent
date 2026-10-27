@@ -1,0 +1,147 @@
+<!doctype html>
+<!--
+  MODERN invoice layout — seeded catalog template, key 'modern'.
+  SAME placeholder contract as invoice.html (classic); only the look differs.
+  Bolder: full-color header band, dark table header, colored totals card.
+  See invoice.html for the placeholder -> data-source mapping.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice {{invoice_number}} — {{company_name}}</title>
+<style>
+  :root {
+    --brand: {{brand_primary_color}};
+    --ink: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: var(--ink); margin: 0; }
+  .page { max-width: 800px; margin: 24px auto; padding: 0 40px; }
+
+  header { background: var(--brand); border-radius: 10px; color: #fff;
+           display: flex; justify-content: space-between; align-items: center;
+           gap: 16px; padding: 18px 22px; margin-top: 24px; }
+  .co { display: flex; align-items: center; gap: 16px; min-width: 0; }
+  .logo { height: 52px; width: auto; border-radius: 8px; padding: 3px;
+          background: rgba(255,255,255,.92); flex: none; }
+  .co h1 { font-size: 20px; margin: 0; letter-spacing: .4px; }
+  .co p  { margin: 2px 0; font-size: 11px; opacity: .88; line-height: 1.5; }
+  .doc { text-align: right; flex: none; }
+  .doc .label { font-size: 22px; font-weight: 800; letter-spacing: 4px; }
+  .doc .num   { font-weight: 600; font-size: 14px; margin-top: 2px; }
+
+  .meta { display: flex; justify-content: space-between; gap: 24px; margin: 22px 0 4px; }
+  .meta h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 1.4px;
+             color: var(--brand); margin: 0 0 5px; }
+  .meta p  { margin: 2px 0; font-size: 13px; line-height: 1.5; }
+  .meta .val { font-weight: 600; }
+
+  table.items { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  .items th { background: var(--ink); color: #fff; text-align: left; font-size: 10px;
+              text-transform: uppercase; letter-spacing: 1.4px; padding: 9px 12px; }
+  .items th.amt { text-align: right; }
+  .items td { padding: 11px 12px; border-bottom: 1px solid var(--line); }
+  .items tr:nth-child(even) td { background: #f8fafc; }
+  .items .amt { text-align: right; white-space: nowrap; }
+
+  .totals { margin-left: auto; width: 330px; margin-top: 14px; }
+  .totals .row { display: flex; justify-content: space-between; padding: 6px 14px; font-size: 14px; }
+  .totals .row.grand { background: var(--brand); color: #fff; font-weight: 700;
+                       border-radius: 8px; margin-top: 6px; padding: 10px 14px; }
+  .totals .row.holdback { color: var(--muted); font-size: 12.5px; }
+
+  .pay { margin-top: 22px; background: #fff; border: 1px solid var(--line); border-radius: 8px;
+         padding: 13px 16px; font-size: 13px; line-height: 1.6; }
+  .pay strong { display: block; font-size: 10px; text-transform: uppercase;
+                letter-spacing: 1.4px; color: var(--brand); margin-bottom: 4px; }
+
+  footer { margin-top: 28px; border-top: 2px solid var(--brand); padding-top: 10px;
+           font-size: 11px; color: var(--muted); text-align: center; line-height: 1.6; }
+
+  @media print {
+    .page { margin: 0; max-width: none; padding: 0; }
+    header { border-radius: 0; margin-top: 0; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body data-tpl="modern">
+<div class="page">
+
+  <header>
+    <div class="co">
+      {{#logo_data_uri}}
+      <img class="logo" src="{{logo_data_uri}}" alt="{{company_name}} logo">
+      {{/logo_data_uri}}
+      <div class="id">
+        <h1>{{company_name}}</h1>
+        <p>{{company_address}}<br>
+           {{company_phone}}<br>
+           GST #: {{gst_reg_number}} &nbsp;&middot;&nbsp; PST #: {{pst_reg_number}}</p>
+      </div>
+    </div>
+    <div class="doc">
+      <div class="label">INVOICE</div>
+      <div class="num">{{invoice_number}}</div>
+    </div>
+  </header>
+
+  <div class="meta">
+    <div>
+      <h3>Bill To</h3>
+      <p><span class="val">{{bill_to_name}}</span>{{#bill_to_address}}<br>
+         {{{bill_to_address}}}{{/bill_to_address}}</p>
+    </div>
+    <div>
+      <h3>Project</h3>
+      <p>{{project_name}}</p>
+    </div>
+    <div style="text-align:right">
+      <h3>Details</h3>
+      <p>Issued&nbsp;<span class="val">{{issued_date}}</span><br>
+         Due&nbsp;<span class="val">{{due_date}}</span><br>
+         {{invoice_type_label}}</p>
+    </div>
+  </div>
+
+  <table class="items">
+    <tr><th style="width:32px">#</th><th>Description</th><th class="amt">Amount</th></tr>
+    {{#line_items}}
+    <tr><td>{{position}}</td>
+        <td>{{description}}</td>
+        <td class="amt">{{amount}}</td></tr>
+    {{/line_items}}
+  </table>
+
+  <div class="totals">
+    <div class="row"><span>Subtotal</span><span>{{net_amount}}</span></div>
+    <div class="row"><span>{{gst_label}}</span><span>{{gst_amount}}</span></div>
+    {{#pst_amount}}
+    <div class="row"><span>PST</span><span>{{pst_amount}}</span></div>
+    {{/pst_amount}}
+    {{^pst_amount}}
+    <div class="row"><span>PST</span><span>Not applicable</span></div>
+    {{/pst_amount}}
+    <div class="row grand"><span>Total due</span><span>{{amount_due}}</span></div>
+    {{#holdback_amount}}
+    <div class="row holdback"><span>{{holdback_label}}: {{holdback_amount}}</span></div>
+    {{/holdback_amount}}
+  </div>
+
+  {{#payment_instructions}}
+  <div class="pay">
+    <strong>Payment instructions</strong>
+    {{{payment_instructions}}}
+  </div>
+  {{/payment_instructions}}
+
+  <footer>
+    {{company_name}} &bull; {{company_address}} &bull; {{company_phone}}<br>
+    Thank you for your business.
+  </footer>
+
+</div>
+</body>
+</html>

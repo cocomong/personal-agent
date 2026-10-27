@@ -120,7 +120,8 @@ CORE = (
 
 GATEWAY_RENDER_JS = (
     CORE
-    + "const html = miniMustache(INVOICE_TEMPLATE, buildInvoiceData(inv));\n"
+    + "const html = miniMustache(inv.invoice_template_html || INVOICE_TEMPLATE,"
+      " buildInvoiceData(inv));\n"
     + "return [{ json: { ...inv, invoiceHtml: html } }];\n"
 )
 
@@ -130,7 +131,8 @@ APPROVE_RENDER_JS = (
     + MUSTACHE_SRC
     + "\nconst INVOICE_TEMPLATE = " + TEMPLATE_LITERAL + ";\n"
     + DATAPREP
-    + "const html = miniMustache(INVOICE_TEMPLATE, buildInvoiceData(inv));\n"
+    + "const html = miniMustache(inv.invoice_template_html || INVOICE_TEMPLATE,"
+      " buildInvoiceData(inv));\n"
     + "return [{ json: { ...inv, html } }];\n"
 )
 
@@ -160,11 +162,44 @@ def patch_render_node(wf: dict, name: str, new_js: str) -> str:
         raise SystemExit(f"missing node: {name}")
     js = node["parameters"]["jsCode"]
     # Idempotent: skip only when the jsCode carries THIS template revision
-    # (the template literal) AND the current data-prep markers.
-    if TEMPLATE_LITERAL in js and "gst_reg_number" in js:
+    # AND the v2 selection logic (row template, embedded fallback).
+    if TEMPLATE_LITERAL in js and "invoice_template_html" in js:
         return "already"
     node["parameters"]["jsCode"] = new_js
     node_js_check(new_js, name)
+    return "patched"
+
+
+# v2: carry the company's chosen template into the render row. LEFT JOIN so a
+# company with no selection (NULL) or a deactivated row yields NULL and the
+# renderer falls back to the embedded Classic — rendering never hard-depends
+# on the catalog table.
+TEMPLATE_SELECT_PATCH = (
+    r"cp\.logo_data, cp\.logo_content_type",
+    "cp.logo_data, cp.logo_content_type,\n       dt.html AS invoice_template_html",
+)
+TEMPLATE_JOIN_PATCH = (
+    r"JOIN company_profile cp ON cp\.id = p\.company_id",
+    "JOIN company_profile cp ON cp.id = p.company_id\n"
+    "LEFT JOIN document_templates dt ON dt.key = cp.invoice_template_key"
+    " AND dt.is_active",
+)
+
+
+def patch_lookup_template(wf: dict, name: str) -> str:
+    nodes = {n["name"]: n for n in wf["nodes"]}
+    node = nodes.get(name)
+    if node is None:
+        raise SystemExit(f"missing node: {name}")
+    query = node["parameters"]["query"]
+    if "invoice_template_html" in query:
+        return "already"
+    for pattern, replacement in (TEMPLATE_SELECT_PATCH, TEMPLATE_JOIN_PATCH):
+        hits = len(re.findall(pattern, query))
+        if hits != 1:
+            raise SystemExit(f"{name}: template patch matched {hits}x, expected 1: {pattern}")
+        query = re.sub(pattern, replacement, query)
+    node["parameters"]["query"] = query
     return "patched"
 
 
@@ -203,6 +238,12 @@ def main() -> int:
           patch_lookup(gateway, "Exec: invoice_push_lookup"))
     print("  Lookup Invoice (approve)   :",
           patch_lookup(approve, "Lookup Invoice"))
+
+    print("template-catalog lookups (LEFT JOIN company's choice):")
+    for wf, name in ((gateway, "Exec: send_customer_invoice_lookup"),
+                     (gateway, "Exec: invoice_push_lookup"),
+                     (approve, "Lookup Invoice")):
+        print(f"  {name}:", patch_lookup_template(wf, name))
 
     # validations: connections intact, node names unique, JSON re-parses
     for label, wf, path in (("voice-gateway", gateway, GATEWAY_PATH),
