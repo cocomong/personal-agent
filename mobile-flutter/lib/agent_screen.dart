@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/transcript_entry.dart';
 import '../session/chat_controller.dart';
+import '../session/session_persistence.dart';
 import '../session/vapi_session_controller.dart';
 
 /// Voice is primary, text is a fallback (ADR-8). Both run on ONE Vapi call
@@ -41,6 +42,21 @@ class _AgentScreenState extends State<AgentScreen> {
     super.initState();
     _session.addListener(_onSessionChanged);
     _session.onAgentTranscript = _onAgentTranscript;
+    _restoreTranscript();
+  }
+
+  /// Android kills backgrounded apps routinely; the transcript is restored
+  /// from disk so a relaunch (also via the personalagent:// deep link) shows
+  /// the previous conversation instead of an empty screen.
+  Future<void> _restoreTranscript() async {
+    final saved = await SessionPersistence.instance.loadTranscript();
+    if (!mounted || saved.isEmpty) return;
+    setState(() {
+      _transcript
+        ..clear()
+        ..addAll(saved);
+      _nextId = saved.length;
+    });
   }
 
   @override
@@ -66,6 +82,7 @@ class _AgentScreenState extends State<AgentScreen> {
 
   void _append(TranscriptEntry entry) {
     setState(() => _transcript.insert(0, entry));
+    unawaited(SessionPersistence.instance.saveTranscript(_transcript));
   }
 
   Future<void> _toggleVoice() async {
