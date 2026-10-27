@@ -68,7 +68,12 @@ class SessionPersistence {
 
   Future<void> saveTranscript(List<TranscriptEntry> entries) async {
     try {
-      final capped = entries.take(_maxEntries).map((e) => e.toJson()).toList();
+      // 'system' entries are UI notices (e.g. "call ended"), not conversation.
+      final capped = entries
+          .where((e) => e.role != 'system')
+          .take(_maxEntries)
+          .map((e) => e.toJson())
+          .toList();
       await _storage.write(key: _transcriptKey, value: jsonEncode(capped));
     } catch (_) {
       // best-effort

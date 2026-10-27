@@ -48,6 +48,10 @@ class _AgentScreenState extends State<AgentScreen> {
   /// Android kills backgrounded apps routinely; the transcript is restored
   /// from disk so a relaunch (also via the personalagent:// deep link) shows
   /// the previous conversation instead of an empty screen.
+  ///
+  /// A restored transcript is NOT a restored call: a voice session is a live
+  /// WebRTC call and dies with the process. Say so, otherwise the enabled
+  /// "Start Voice" button looks like the app lost track of a call it was in.
   Future<void> _restoreTranscript() async {
     final saved = await SessionPersistence.instance.loadTranscript();
     if (!mounted || saved.isEmpty) return;
@@ -56,6 +60,18 @@ class _AgentScreenState extends State<AgentScreen> {
         ..clear()
         ..addAll(saved);
       _nextId = saved.length;
+      if (saved.any((e) => e.isVoice)) {
+        _transcript.insert(
+          0,
+          const TranscriptEntry(
+            id: 'sys-restore',
+            role: 'system',
+            text: 'Conversation restored · the previous voice call ended when '
+                'the app was closed. Tap Start Voice to continue.',
+            isVoice: false,
+          ),
+        );
+      }
     });
   }
 
@@ -247,6 +263,22 @@ class _TranscriptList extends StatelessWidget {
       itemCount: entries.length,
       itemBuilder: (context, i) {
         final e = entries[i];
+        if (e.role == 'system') {
+          // UI notice (e.g. "conversation restored, call ended") — no bubble.
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            child: Text(
+              e.text,
+              key: ValueKey(e.id),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  height: 1.35),
+            ),
+          );
+        }
         final isUser = e.role == 'user';
         return Align(
           alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
