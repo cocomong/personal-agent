@@ -80,7 +80,7 @@ def main() -> int:
                     {"PUBLIC_BASE_URL": "https://n8n2.ordrnow.com", "AUTH_TOKEN_SECRET": SECRET})
     html = page["html"]
     assert html.count('<section class="card') == 3, "three cards"
-    assert html.count("iframe srcdoc=") == 3, "three isolated iframes"
+    assert html.count("iframe data-src=") == 3, "three isolated iframes"
     assert html.count('<form class="choose"') == 3, "three choose forms"
     for key in ("classic", "modern", "compact"):
         assert f'value="{key}"' in html, f"choose button for {key}"
@@ -88,8 +88,12 @@ def main() -> int:
     # srcdoc round-trip: every iframe must carry a COMPLETE document (a broken
     # escape silently blanks the preview — the bug this test exists for).
     import re as _re
-    srcdocs = _re.findall(r'<iframe srcdoc="([^"]*)"', html)
-    assert len(srcdocs) == 3, f"three srcdoc payloads, got {len(srcdocs)}"
+    # payloads live in data-src and are materialised lazily (one document at a
+    # time) — three simultaneous documents is what killed the app on a 4 GB phone
+    assert '<iframe srcdoc=' not in html, "iframes must not preload all three documents"
+    assert "IntersectionObserver" in html, "lazy iframe loader missing"
+    srcdocs = _re.findall(r'<iframe data-src="([^"]*)"', html)
+    assert len(srcdocs) == 3, f"three data-src payloads, got {len(srcdocs)}"
     for i, raw in enumerate(srcdocs):
         decoded = (raw.replace("&quot;", '"').replace("&lt;", "<")
                       .replace("&gt;", ">").replace("&amp;", "&"))

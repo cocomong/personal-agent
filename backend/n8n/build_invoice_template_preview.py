@@ -143,7 +143,7 @@ const cards = templates.map((t) => {
       <div><h2>${esc(t.display_name)}</h2><p>${esc(t.description || '')}</p></div>
       ${cur ? '<span class="badge">Current style</span>' : ''}
     </div>
-    <div class="frame"><iframe srcdoc="${esc(html)}" title="${esc(t.display_name)}"></iframe></div>
+    <div class="frame"><iframe data-src="${esc(html)}" title="${esc(t.display_name)}"></iframe></div>
     <form class="choose" method="post" action="${chooseBase}">
       <input type="hidden" name="template" value="${esc(t.key)}">
       <button type="submit"${cur ? ' disabled' : ''}>${cur ? 'In use' : 'Use this style'}</button>
@@ -183,6 +183,29 @@ const page = `<!doctype html><html lang="en"><head><meta charset="utf-8">
      issued ones keep their original look. (Sample data with your real branding.)</p>
 </div>
 <div class="rail">${cards}</div>
+<script>
+  // Lazy iframes: each card holds a COMPLETE invoice document (own CSS,
+  // own embedded logo). Rendering all three at once triples Chrome's document
+  // memory and got the backgrounded app killed on 4 GB phones. Load when the
+  // card is on screen, release when it scrolls fully away.
+  (function () {
+    var frames = Array.prototype.slice.call(document.querySelectorAll('iframe[data-src]'));
+    function load(f) {
+      if (!f.hasAttribute('srcdoc') && f.dataset.src) f.setAttribute('srcdoc', f.dataset.src);
+    }
+    if (!('IntersectionObserver' in window)) { frames.forEach(load); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) load(e.target);
+        else if (e.intersectionRatio === 0 && e.target.hasAttribute('srcdoc')) {
+          e.target.removeAttribute('srcdoc');
+          e.target.src = 'about:blank';
+        }
+      });
+    }, { threshold: 0.01, rootMargin: '0px 40px' });
+    frames.forEach(function (f) { io.observe(f); });
+  })();
+</script>
 </body></html>`;
 return [{ json: { html: page } }];
 """
