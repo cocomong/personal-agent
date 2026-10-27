@@ -34,6 +34,34 @@ call-start (after the SDK has RECORD_AUDIO — Android 14 requires it) and stopp
 on stop()/call-end/dispose. Doze was suspending the process when the screen went
 off, dropping the WebRTC session. Needs on-device verification (screen off mid-call).
 
+## DONE 2026-10-26 — invoice layout template + embedded company logo
+Invoice rendering is now TEMPLATE-DRIVEN instead of three hand-synced inline
+builders. `backend/templates/invoice.html` (strict Mustache) is the single
+layout source; `backend/templates/mustache_mini.js` (dependency-free Mustache
+subset, unit tests in mustache_mini.test.js) renders it. All THREE render
+sites are generated from it by `backend/n8n/patch_invoice_template.py`
+(idempotent, node --check on each generated jsCode): gateway `Render Invoice
+HTML` (email) + `Render Push Invoice HTML` (push) → invoiceHtml, and
+approve-invoice `Render Client Invoice` → html (keeps the last_client_html
+short-circuit). buildInvoiceData preserves every old mapping (type label
+translation, descriptive billing line, bill-to lines, holdback %, GST/PST,
+payment lines). THE LOGO IS BAKED IN AS A data: URI — an issued/archived
+invoice is self-contained and never depends on an externally linked image
+(Gmail strips data: URIs in email bodies; the text header still renders, and
+the hosted review page shows the logo). db/0035 company_profile.logo_data
+(base64) + logo_content_type (+0036 verify); logo file
+backend/branding/house-logo.svg, seeded by backend/n8n/seed_company_logo.py
+(idempotent UPDATE); the three feeding lookups
+(send_customer_invoice_lookup, invoice_push_lookup, Lookup Invoice) now
+select the logo columns. Also fixed the live leftover company_profile
+.company_name 'MSI dot com' → 'Ireh Construction' (the 2026-10-06 finding).
+Verified: harness render of the real INV-0001 row through the exact deployed
+jsCode, plus live E2E (QA draft INV-0003 → preview email to
+support.ordrnow@gmail.com → stored last_client_html 7154 bytes with logo data
+URI + template markers + correct company name); QA draft deleted and
+invoice_last_number reset to 2 (one preview row left in invoice_email_log as
+the probe's audit trail).
+
 ## DONE 2026-09-10 — tool-routing fix: 4 tools were silently dead
 `find_customer`, `list_estimate_status`, `send_invoice_to_phone` and
 `send_payment_receipt` (all added 2026-09-06..08) shipped WITHOUT their own

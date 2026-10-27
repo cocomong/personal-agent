@@ -50,6 +50,7 @@ MIGRATIONS=(
   0029_approval_log.sql
   0031_estimate_state.sql
   0033_projects_soft_delete.sql
+  0035_company_logo.sql
 )
 
 VERIFY=(
@@ -63,6 +64,7 @@ VERIFY=(
   0030_approval_log_verify.sql
   0032_estimate_state_verify.sql
   0034_projects_soft_delete_verify.sql
+  0036_company_logo_verify.sql
 )
 
 echo "== Migrations =="
