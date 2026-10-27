@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:personal_agent_mobile/agent_screen.dart';
 import 'package:personal_agent_mobile/session/chat_controller.dart';
+import 'package:personal_agent_mobile/session/vapi_session_controller.dart';
 
 /// Records what would have been POSTed to /webhook/chat and returns canned
 /// replies (or throws, to exercise the error path).
@@ -81,5 +82,82 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('did not respond'), findsOneWidget);
+  });
+
+  nudgeTests();
+}
+
+/// A session that never touches the network: reports whatever connection
+/// state the test wants and records say() calls.
+class FakeSession extends VapiSessionController {
+  FakeSession({required this.connected});
+
+  final bool connected;
+  final List<String> said = [];
+
+  @override
+  SessionStatus get status =>
+      connected ? SessionStatus.connected : SessionStatus.disconnected;
+
+  @override
+  bool get isConnected => connected;
+
+  @override
+  Future<void> say(String text) async => said.add(text);
+}
+
+void _lifecycle(WidgetTester tester, AppLifecycleState state) {
+  tester.binding.handleAppLifecycleStateChanged(state);
+}
+
+void nudgeTests() {
+  testWidgets('backgrounding a live call nudges once after 6 s', (tester) async {
+    final session = FakeSession(connected: true);
+    await tester.pumpWidget(MaterialApp(
+        home: AgentScreen(chat: FakeChatController(), session: session)));
+
+    _lifecycle(tester, AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 5));
+    expect(session.said, isEmpty, reason: 'nothing before the 6 s delay');
+
+    await tester.pump(const Duration(seconds: 2));
+    expect(session.said, ["I'm still here — should I hang up?"]);
+
+    // Still paused: the timer must not fire again.
+    await tester.pump(const Duration(seconds: 20));
+    expect(session.said.length, 1);
+
+    // A new excursion gets its own single nudge.
+    _lifecycle(tester, AppLifecycleState.resumed);
+    await tester.pump();
+    _lifecycle(tester, AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 7));
+    expect(session.said.length, 2);
+  });
+
+  testWidgets('no nudge when no call is connected', (tester) async {
+    final session = FakeSession(connected: false);
+    await tester.pumpWidget(MaterialApp(
+        home: AgentScreen(chat: FakeChatController(), session: session)));
+
+    _lifecycle(tester, AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 10));
+    expect(session.said, isEmpty);
+  });
+
+  testWidgets('pending style choice gets the contextual nudge', (tester) async {
+    final session = FakeSession(connected: true);
+    await tester.pumpWidget(MaterialApp(
+        home: AgentScreen(chat: FakeChatController(), session: session)));
+
+    // Simulate the assistant's turn that offered the styles.
+    session.onAgentTranscript?.call('The 3 styles are on your phone.');
+    await tester.pump();
+
+    _lifecycle(tester, AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 7));
+
+    expect(session.said.single,
+        'Take your time — tell me which style you like, or tap it on your phone.');
   });
 }

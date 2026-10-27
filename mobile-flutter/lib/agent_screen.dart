@@ -27,7 +27,8 @@ class AgentScreen extends StatefulWidget {
   State<AgentScreen> createState() => _AgentScreenState();
 }
 
-class _AgentScreenState extends State<AgentScreen> {
+class _AgentScreenState extends State<AgentScreen>
+    with WidgetsBindingObserver {
   late final VapiSessionController _session =
       widget.session ?? VapiSessionController();
   late final ChatController _chat = widget.chat ?? ChatController();
@@ -37,12 +38,54 @@ class _AgentScreenState extends State<AgentScreen> {
   bool _voiceMode = true;
   int _nextId = 0;
 
+  /// Background nudge: when the app is paused mid-call the assistant is still
+  /// listening (and billing). After 6 s say something so the user knows the
+  /// session is live and can hang up on purpose. One nudge per excursion.
+  Timer? _nudgeTimer;
+  bool _nudgedThisExcursion = false;
+  static const _nudgeDelay = Duration(seconds: 6);
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _session.addListener(_onSessionChanged);
     _session.onAgentTranscript = _onAgentTranscript;
     _restoreTranscript();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _scheduleNudge();
+    } else if (state == AppLifecycleState.resumed) {
+      _nudgeTimer?.cancel();
+      _nudgedThisExcursion = false;
+    }
+  }
+
+  void _scheduleNudge() {
+    if (!_session.isConnected || _nudgedThisExcursion) return;
+    _nudgeTimer?.cancel();
+    _nudgeTimer = Timer(_nudgeDelay, () {
+      if (!mounted || !_session.isConnected || _nudgedThisExcursion) return;
+      _nudgedThisExcursion = true;
+      unawaited(_session.say(_nudgeText()));
+    });
+  }
+
+  /// Context first: if the assistant just offered the invoice styles, prompt
+  /// for the choice; otherwise ask whether to hang up.
+  String _nudgeText() {
+    for (final e in _transcript) {
+      if (e.role != 'agent') continue;
+      final t = e.text.toLowerCase();
+      if (t.contains('style') || t.contains('template')) {
+        return 'Take your time — tell me which style you like, or tap it on your phone.';
+      }
+      break;
+    }
+    return "I'm still here — should I hang up?";
   }
 
   /// Android kills backgrounded apps routinely; the transcript is restored
@@ -77,6 +120,8 @@ class _AgentScreenState extends State<AgentScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _nudgeTimer?.cancel();
     _draftController.dispose();
     _session.removeListener(_onSessionChanged);
     _session.dispose();

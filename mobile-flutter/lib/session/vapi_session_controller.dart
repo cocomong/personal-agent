@@ -169,6 +169,14 @@ class VapiSessionController extends ChangeNotifier {
     _call?.setMuted(muted);
   }
 
+  /// Make the assistant speak a fixed line right now — Vapi's `say` control
+  /// message, so it costs no model turn and cannot improvise. Used when the
+  /// app is backgrounded mid-call (see AgentScreen's lifecycle nudge).
+  Future<void> say(String text) async {
+    if (_call == null || _status != SessionStatus.connected) return;
+    await _call!.send({'type': 'say', 'message': text});
+  }
+
   Future<void> stop() async {
     _stopGeneration++; // supersede any start still connecting
     unawaited(ForegroundCallService.stop());
