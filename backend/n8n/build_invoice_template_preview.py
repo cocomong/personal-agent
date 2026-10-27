@@ -220,31 +220,35 @@ def js_check(js: str, label: str) -> None:
 def main() -> int:
     review = json.loads(REVIEW.read_text())
     tpl = {n["type"]: n for n in review["nodes"]}
+    id_counter = iter(range(1, 100))
+
+    def nid() -> str:
+        return f"tpl-{next(id_counter):04d}"
 
     def webhook(path, method, name, wid, x, y):
         n = copy.deepcopy(tpl["n8n-nodes-base.webhook"])
         n["parameters"]["path"] = path
         n["parameters"]["httpMethod"] = method
         n["webhookId"] = wid
-        n["id"], n["name"], n["position"] = f"tpl-{x:02d}", name, [x, y]
+        n["id"], n["name"], n["position"] = nid(), name, [x, y]
         return n
 
     def code(name, js, x, y):
         js_check(js, name)
-        return {"parameters": {"jsCode": js}, "id": f"tpl-{x:02d}",
+        return {"parameters": {"jsCode": js}, "id": nid(),
                 "name": name, "type": "n8n-nodes-base.code",
                 "typeVersion": 2, "position": [x, y]}
 
     def ifnode(name, x, y):
         n = copy.deepcopy(tpl["n8n-nodes-base.if"])
-        n["id"], n["name"], n["position"] = f"tpl-{x:02d}", name, [x, y]
+        n["id"], n["name"], n["position"] = nid(), name, [x, y]
         return n
 
     def postgres(name, query, repl, x, y, always=False):
         params = {"operation": "executeQuery", "query": query}
         if repl is not None:
             params["options"] = {"queryReplacement": repl}
-        n = {"parameters": params, "id": f"tpl-{x:02d}", "name": name,
+        n = {"parameters": params, "id": nid(), "name": name,
              "type": "n8n-nodes-base.postgres", "typeVersion": 2.5,
              "position": [x, y], "credentials": copy.deepcopy(PG_CREDS)}
         if always:
@@ -254,7 +258,7 @@ def main() -> int:
     def respond(name, ok_200, x, y):
         n = copy.deepcopy(tpl["n8n-nodes-base.respondToWebhook"])
         n["parameters"]["options"]["responseCode"] = 200 if ok_200 else 400
-        n["id"], n["name"], n["position"] = f"tpl-{x:02d}", name, [x, y]
+        n["id"], n["name"], n["position"] = nid(), name, [x, y]
         return n
 
     nodes = [

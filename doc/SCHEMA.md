@@ -1,6 +1,6 @@
 # Database Schema — live (generated)
 
-> **Generated 2026-10-25 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0034 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
+> **Generated 2026-10-27 from the live production DB** (n8n2.ordrnow.com, container `n8n-compose-postgres-1`, db `postgres`, PostgreSQL 17). Reflects migrations 0001–0038 applied. This file is machine-generated, not hand-maintained — after any schema change, re-run the extraction in the Appendix and regenerate.
 
 ## Conventions
 - Every business table PK is `id UUID DEFAULT uuid_generate_v4()` (uuid-ossp).
@@ -58,10 +58,14 @@
 | `gst_reg_number` | `character varying(50)` |  |
 | `pst_reg_number` | `character varying(50)` |  |
 | `payment_instructions` | `text` | Free-text how-to-pay block shown on client invoices |
+| `logo_data` | `text` | Base64-encoded logo bytes (SVG/PNG). Rendered into invoice HTML as data:<type>;base64,<bytes> so archived invoices are self-contained. |
+| `logo_content_type` | `text` | MIME type of logo_data (e.g. image/svg+xml, image/png). NULL when no logo is on file. |
+| `invoice_template_key` | `text` | Chosen invoice layout (document_templates.key). NULL = Classic default. Set during onboarding or via set_invoice_template; issued invoices keep their stored last_client_html regardless of later switches. |
 - FK: `created_by_user` → `users(id)`
+- FK: `invoice_template_key` → `document_templates(key)`
 - PK constraint `company_profile_pkey`
 
-*created in 0007_company_profile, 0014_schedule, 0016_onboarding, 0019_tenant_columns, 0021_invoice_fixes, 0023_invoice_presentation*
+*created in 0007_company_profile, 0014_schedule, 0016_onboarding, 0019_tenant_columns, 0021_invoice_fixes, 0023_invoice_presentation, 0035_company_logo, 0037_invoice_templates*
 
 ### users
 
@@ -432,6 +436,25 @@
 - index `idx_device_tokens_platform`
 
 *created in 0015_device_tokens, 0019_tenant_columns*
+
+## Other tables
+
+### document_templates
+
+| Column | Type | Flags / default |
+|--------|------|-----------------|
+| `id` | `uuid` | NOT NULL, default uuid_generate_v4() |
+| `key` | `text` | NOT NULL |
+| `display_name` | `text` | NOT NULL |
+| `description` | `text` | NOT NULL, default '' |
+| `html` | `text` | NOT NULL |
+| `is_active` | `boolean` | NOT NULL, default true, false = hidden from the catalog; companies pointing at it fall back to the embedded Classic. |
+| `created_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
+| `updated_at` | `timestamp with time zone` | NOT NULL, default CURRENT_TIMESTAMP |
+- UNIQUE constraint `document_templates_key_key` (key)
+- PK constraint `document_templates_pkey`
+
+*created in 0037_invoice_templates*
 
 ## Views
 

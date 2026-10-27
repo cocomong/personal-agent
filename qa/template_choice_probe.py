@@ -23,13 +23,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 HOST = "ubuntu@n8n2.ordrnow.com"
 GATEWAY = "https://n8n2.ordrnow.com/webhook/voice/gateway"
-SIG_HELPER = r'''
-import hmac, hashlib, base64, time, sys
-secret, payload = sys.argv[1], sys.argv[2]
-print(base64.urlsafe_b64encode(
-    hmac.new(secret.encode(), payload.encode(), hashlib.sha256).digest()
-).decode().rstrip("="))
-'''
+SIG_HELPER = (
+    "import hmac,hashlib,base64,sys;"
+    "print(base64.urlsafe_b64encode("
+    "hmac.new(sys.argv[1].encode(),sys.argv[2].encode(),hashlib.sha256).digest()"
+    ").decode().rstrip('='))"
+)
 
 
 def ssh(cmd: str) -> str:
@@ -58,7 +57,7 @@ def db(q: str) -> str:
 
 def signed_url(kind: str):
     exp = int(time.time()) + 3600
-    payload = f"1.{kind}.{exp}"
+    payload = f"1.template-{kind}.{exp}"  # workflow signs `${company}.template-${kind}.${exp}`
     sig = ssh(f"cd /home/ubuntu/n8n-compose && SECRET=$(sudo docker exec "
               f"n8n-compose-n8n-1 printenv AUTH_TOKEN_SECRET) && "
               f"python3 -c {json.dumps(SIG_HELPER)} \"$SECRET\" \"{payload}\"")
@@ -67,6 +66,14 @@ def signed_url(kind: str):
 
 
 def main() -> int:
+    # Self-clean: drop QA drafts left by earlier probe runs, then reset the
+    # invoice counter to the highest real INV-NNNN (skips grandfathered
+    # legacy numbers like INV-OAK-1001).
+    db("DELETE FROM invoices WHERE description='QA template probe - delete me'"
+       " AND status='DRAFT'")
+    db("UPDATE company_profile SET invoice_last_number = COALESCE("
+       "(SELECT max(substring(invoice_number FROM '[0-9]+$')::int) FROM invoices "
+       " WHERE invoice_number ~ '^INV-[0-9]{4}$'), 0) WHERE id=1")
     num_before = db("SELECT invoice_last_number FROM company_profile WHERE id=1")
 
     # 1) set modern via the tool
@@ -84,7 +91,9 @@ def main() -> int:
     assert num, f"create reply: {reply}"
     reply = gateway_call("send_customer_invoice", {"invoice_id": f"INV-{num}"})
     assert "Preview emailed" in reply, f"send reply: {reply}"
-    stored = db(f"SELECT position('data-tpl=\"modern\"' in last_client_html) > 0, "
+    # NOTE: chr(34) instead of literal double quotes — the query travels
+    # through ssh + a shell double-quoted -c string, which eats them.
+    stored = db(f"SELECT position('data-tpl=' || chr(34) || 'modern' || chr(34) in last_client_html) > 0, "
                 f"position('data:image/svg+xml;base64,' in last_client_html) > 0 "
                 f"FROM invoices WHERE invoice_number='INV-{num}'")
     assert stored == "t|t", f"stored HTML markers: {stored}"
