@@ -28,3 +28,7 @@ public/
 #dev works/note
 flyer
 notes
+
+# python bytecode
+__pycache__/
+*.pyc
