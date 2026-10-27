@@ -191,6 +191,12 @@ CHOOSE_PAGE_JS = """// Confirmation page after a tap-to-choose POST. Hands contr
 // app: an explicit "Back to the app" button (a click is always allowed) plus
 // a best-effort auto-redirect to the app scheme.
 const r = $input.first().json || {};
+// Return-to-app: an Android intent URL goes to the installed app by package
+// + component (the app declares NO custom scheme). Chrome allows this from a
+// user tap; if the app is missing the browser falls back to S.browser_fallback_url.
+const APP_RETURN = 'intent://app#Intent;package=com.ordrnow.personal_agent_mobile;'
+  + 'component=com.ordrnow.personal_agent_mobile/.MainActivity;'
+  + 'S.browser_fallback_url=https%3A%2F%2Fn8n2.ordrnow.com%2F;end';
 // \x26 = '&', so the entities can never be mangled in transit
 const esc = (s) => String(s).replace(/&/g, '\x26amp;').replace(/</g, '\x26lt;').replace(/>/g, '\x26gt;');
 const ok = r.outcome === 'UPDATED';
@@ -203,6 +209,7 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
   .box { background: #1e293b; padding: 26px 28px; border-radius: 12px; text-align: center; max-width: 420px; }
   h1 { font-size: 20px; margin: 0 0 8px; }
   p { color: #94a3b8; font-size: 14px; margin: 0 0 18px; line-height: 1.6; }
+  .note { color: #64748b; font-size: 11px; margin: 10px 0 0; }
   .btn { display: inline-block; background: #2563eb; color: #fff; text-decoration: none;
          padding: 12px 22px; border-radius: 8px; font-weight: 600; font-size: 15px; }
 </style></head><body><div class="box">
@@ -210,9 +217,10 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <p>${ok
   ? 'New invoices will use the ' + esc(r.template) + ' layout. Already-issued invoices keep their original look.'
   : 'That style is not in the catalog. Go back and pick Classic, Modern or Compact.'}</p>
-<a class="btn" href="openclaw://app">Back to the app</a>
+<a class="btn" href="${APP_RETURN}">Back to the app</a>
+<p class="note">If the button does nothing, the app is not installed on this device.</p>
 </div>
-${ok ? `<script>setTimeout(function () { try { window.location.href = 'openclaw://app'; } catch (e) {} }, 1200);</script>` : ''}
+${ok ? `<script>setTimeout(function () { try { window.location.href = ${JSON.stringify(APP_RETURN)}; } catch (e) {} }, 1200);</script>` : ''}
 </body></html>`;
 return [{ json: { html } }];
 """

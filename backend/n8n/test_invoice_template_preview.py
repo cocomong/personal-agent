@@ -146,9 +146,15 @@ def main() -> int:
     bad_page = run_node(NODES["Build Choice Page"]["parameters"]["jsCode"],
                         {"outcome": "INVALID_TEMPLATE", "template": None}, {})
     assert "Unknown style" in bad_page["html"], "INVALID page"
-    # hands control back to the app
+    # hands control back to the app: Android intent:// to the real package
+    # (the app has no custom scheme — MAIN/LAUNCHER only)
     for label, page in (("UPDATED", ok_page), ("INVALID", bad_page)):
-        assert "openclaw://app" in page["html"], f"{label} page: no app return link"
+        h = page["html"]
+        assert "intent://app#Intent;package=com.ordrnow.personal_agent_mobile" in h, \
+            f"{label} page: no intent return link"
+        assert "component=com.ordrnow.personal_agent_mobile/.MainActivity" in h, \
+            f"{label} page: return link names the wrong component"
+        assert "openclaw://" not in h, f"{label} page: dead custom scheme still present"
     print("choice pages: UPDATED + INVALID — OK")
 
     print("invoice-template-preview harness: ALL GREEN")
