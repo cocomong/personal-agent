@@ -40,7 +40,8 @@ const data = {
   company_name: 'Ireh Construction',
   company_address: '1951 Kaptey Ave, Coquitlam, BC  V3K 5Z7',
   company_phone: '778-994-6602',
-  gst_reg_line: 'GST # BC123<br>PST # null',
+  gst_reg_number: 'BC123456789',
+  pst_reg_number: '',
   logo_data_uri: 'data:image/svg+xml;base64,SGVsbG8=',
   invoice_number: 'INV-0007',
   issued_date: '2026-10-25',
@@ -70,7 +71,11 @@ assert.ok(html.includes('$14,831.25'), 'total due');
 assert.ok(html.includes('Not applicable'), 'PST zero -> not applicable');
 assert.ok(!html.includes('Holdback (10% retained)'), 'holdback omitted when empty');
 assert.ok(!html.includes('$undefined'), 'no undefined leaked');
-assert.ok(html.includes('GST # BC123<br>'), 'multi-line fields render raw (triple mustache)');
+assert.ok(html.includes('GST #: BC123456789'), 'header GST reg line always present');
+assert.ok(html.includes('PST #:'), 'header PST reg line reserved (blank when unset)');
+const zeroGst = render(tpl, { ...data, gst_amount: '$0.00', pst_amount: 0 });
+assert.ok(zeroGst.includes('$0.00'), 'GST row kept even when zero');
+assert.ok(zeroGst.includes('Not applicable'), 'PST zero -> Not applicable row');
 assert.ok(html.includes('E-transfer to the office.<br>'), 'payment instructions raw');
 
 console.log('mustache_mini: all tests passed; rendered template bytes:', html.length);

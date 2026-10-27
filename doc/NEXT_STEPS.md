@@ -60,7 +60,16 @@ jsCode, plus live E2E (QA draft INV-0003 → preview email to
 support.ordrnow@gmail.com → stored last_client_html 7154 bytes with logo data
 URI + template markers + correct company name); QA draft deleted and
 invoice_last_number reset to 2 (one preview row left in invoice_email_log as
-the probe's audit trail).
+the probe's audit trail). LAYOUT REVISION (same day, user decisions): the random
+house-logo stays live as a PLACEHOLDER until the real logo arrives (swap =
+replace backend/branding/house-logo.svg, re-run seed_company_logo.py); the
+invoice header now ALWAYS shows "GST #:" and "PST #:" lines (blank until the
+registration numbers are filled) and the totals ALWAYS show the GST row
+($0.00 when zero) and the PST row (amount or "Not applicable") — reserved
+space, per the user's "leave room for GST and PST". Patch script idempotency
+is template-literal-based so template edits regenerate the nodes. Re-verified
+live (second QA probe, INV-0003 again): stored HTML 7192 bytes with logo +
+both reg lines + both tax rows; draft deleted, numbering reset.
 
 ## DONE 2026-09-10 — tool-routing fix: 4 tools were silently dead
 `find_customer`, `list_estimate_status`, `send_invoice_to_phone` and

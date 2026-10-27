@@ -95,8 +95,9 @@
       <div class="id">
         <h1>{{company_name}}</h1>
         <p>{{company_address}}<br>
-           {{company_phone}}{{#gst_reg_line}}<br>
-           {{{gst_reg_line}}}{{/gst_reg_line}}</p>
+           {{company_phone}}<br>
+           GST #: {{gst_reg_number}}<br>
+           PST #: {{pst_reg_number}}</p>
       </div>
     </div>
     <div class="doc">
@@ -132,11 +133,9 @@
 
   <div class="totals">
     <div class="row"><span>Subtotal</span><span>{{net_amount}}</span></div>
-    {{#gst_amount}}
     <div class="row"><span>{{gst_label}}</span><span>{{gst_amount}}</span></div>
-    {{/gst_amount}}
     {{#pst_amount}}
-    <div class="row"><span>{{pst_label}}</span><span>{{pst_amount}}</span></div>
+    <div class="row"><span>PST</span><span>{{pst_amount}}</span></div>
     {{/pst_amount}}
     {{^pst_amount}}
     <div class="row"><span>PST</span><span>Not applicable</span></div>

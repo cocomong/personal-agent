@@ -52,9 +52,7 @@ function buildInvoiceData(inv) {
   const addressLine = [inv?.street_address, inv?.city,
                        `${inv?.province ?? ''} ${inv?.postal_code ?? ''}`]
     .filter(Boolean).join(', ');
-  const taxBits = [];
-  if (inv?.gst_reg_number) taxBits.push('GST # ' + inv.gst_reg_number);
-  if (inv?.pst_reg_number) taxBits.push('PST # ' + inv.pst_reg_number);
+  const taxBits = [];  // (header reg lines are always rendered in the template)
   const lines = Array.isArray(inv?.lines) ? inv.lines : [];
   const pct = inv?.billing_percentage;
   const basis = inv?.billed_basis;
@@ -82,7 +80,10 @@ function buildInvoiceData(inv) {
     company_name: inv?.company_name ?? 'Ireh Construction',
     company_address: addressLine,
     company_phone: inv?.phone ?? '',
-    gst_reg_line: taxBits.join('<br>'),
+    // Header reg lines are ALWAYS on the layout (blank until the company
+    // fills its registration numbers) — the user asked for reserved space.
+    gst_reg_number: inv?.gst_reg_number ?? '',
+    pst_reg_number: inv?.pst_reg_number ?? '',
     // The logo is baked in as a data: URI — an archived invoice never
     // depends on an externally linked image.
     logo_data_uri: inv?.logo_data && inv?.logo_content_type
@@ -98,8 +99,9 @@ function buildInvoiceData(inv) {
     line_items: items,
     net_amount: money(inv?.net_amount),
     gst_label: 'GST',
-    gst_amount: Number(inv?.gst_amount) ? money(inv.gst_amount) : 0,
-    pst_label: 'PST',
+    // GST row is always on the layout ($0.00 when zero) — reserved space.
+    gst_amount: money(inv?.gst_amount),
+    // PST row is always on the layout: the amount, or "Not applicable".
     pst_amount: Number(inv?.pst_amount) ? money(inv.pst_amount) : 0,
     amount_due: money(inv?.amount_due),
     holdback_amount: Number(inv?.holdback_amount) ? money(inv.holdback_amount) : '',
@@ -156,7 +158,10 @@ def patch_render_node(wf: dict, name: str, new_js: str) -> str:
     node = nodes.get(name)
     if node is None:
         raise SystemExit(f"missing node: {name}")
-    if "INVOICE_TEMPLATE" in node["parameters"]["jsCode"]:
+    js = node["parameters"]["jsCode"]
+    # Idempotent: skip only when the jsCode carries THIS template revision
+    # (the template literal) AND the current data-prep markers.
+    if TEMPLATE_LITERAL in js and "gst_reg_number" in js:
         return "already"
     node["parameters"]["jsCode"] = new_js
     node_js_check(new_js, name)
