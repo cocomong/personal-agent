@@ -194,7 +194,10 @@ const r = $input.first().json || {};
 // Return-to-app: an Android intent URL goes to the installed app by package
 // + component (the app declares NO custom scheme). Chrome allows this from a
 // user tap; if the app is missing the browser falls back to S.browser_fallback_url.
-const APP_RETURN = 'intent://app#Intent;package=com.ordrnow.personal_agent_mobile;'
+const APP_RETURN = 'personalagent://app';  // declared in the app manifest
+// Fallback for phones still running the older apk (before the scheme existed):
+// a component intent launches the app by package+activity on any Chrome.
+const APP_INTENT = 'intent://app#Intent;package=com.ordrnow.personal_agent_mobile;'
   + 'component=com.ordrnow.personal_agent_mobile/.MainActivity;'
   + 'S.browser_fallback_url=https%3A%2F%2Fn8n2.ordrnow.com%2F;end';
 // \x26 = '&', so the entities can never be mangled in transit
@@ -217,10 +220,22 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <p>${ok
   ? 'New invoices will use the ' + esc(r.template) + ' layout. Already-issued invoices keep their original look.'
   : 'That style is not in the catalog. Go back and pick Classic, Modern or Compact.'}</p>
-<a class="btn" href="${APP_RETURN}">Back to the app</a>
+<a class="btn" id="backApp" href="${APP_RETURN}">Back to the app</a>
 <p class="note">If the button does nothing, the app is not installed on this device.</p>
 </div>
-${ok ? `<script>setTimeout(function () { try { window.location.href = ${JSON.stringify(APP_RETURN)}; } catch (e) {} }, 1200);</script>` : ''}
+<script>
+  (function () {
+    var go = function (u) { try { window.location.href = u; } catch (e) {} };
+    var btn = document.getElementById('backApp');
+    if (btn) btn.addEventListener('click', function () {
+      // if the scheme opened nothing (old apk), fall back to the component intent
+      setTimeout(function () { if (!document.hidden) go(${JSON.stringify(APP_INTENT)}); }, 1200);
+    });
+    ${ok ? `// best-effort auto-return: scheme first, component intent second
+    setTimeout(function () { if (!document.hidden) go(${JSON.stringify(APP_RETURN)}); }, 1400);
+    setTimeout(function () { if (!document.hidden) go(${JSON.stringify(APP_INTENT)}); }, 3000);` : ''}
+  })();
+</script>
 </body></html>`;
 return [{ json: { html } }];
 """

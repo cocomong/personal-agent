@@ -35,6 +35,17 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
+     * Deep link (personalagent://app) from the invoice-style preview page.
+     * launchMode=singleTop means the running instance receives this instead of
+     * a second one being created; Flutter state (and the chat) stays intact —
+     * all we need is Android bringing the task forward.
+     */
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
+    /**
      * Android 13+: without POST_NOTIFICATIONS the foreground-service
      * notification is hidden (the service itself still runs). Ask on start.
      */

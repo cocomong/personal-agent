@@ -150,8 +150,10 @@ def main() -> int:
     # (the app has no custom scheme — MAIN/LAUNCHER only)
     for label, page in (("UPDATED", ok_page), ("INVALID", bad_page)):
         h = page["html"]
+        assert 'href="personalagent://app"' in h, \
+            f"{label} page: no personalagent:// deep link"
         assert "intent://app#Intent;package=com.ordrnow.personal_agent_mobile" in h, \
-            f"{label} page: no intent return link"
+            f"{label} page: no component-intent fallback for old apks"
         assert "component=com.ordrnow.personal_agent_mobile/.MainActivity" in h, \
             f"{label} page: return link names the wrong component"
         assert "openclaw://" not in h, f"{label} page: dead custom scheme still present"

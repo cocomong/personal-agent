@@ -17,7 +17,6 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -33,6 +32,18 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Return-to-app deep link. The invoice-style preview page hands
+                 control back here after the PM taps "Use this style"
+                 (personalagent://app). Scheme-only on purpose: any
+                 personalagent:// URL simply means "surface the running app" —
+                 the activity is singleTop, so the existing instance (and its
+                 Flutter state) is reused, no second instance. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="personalagent"/>
             </intent-filter>
         </activity>
         <!-- Keeps the voice call alive with the screen off (see VoiceCallService).
