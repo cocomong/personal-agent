@@ -97,7 +97,8 @@ BUILD_PAGE_JS = """// Build the side-by-side, swipeable template preview page. E
 const row = $input.first().json;
 const crypto = require('crypto');
 const money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
-const esc = (s) => String(s).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
+// \x26 = '&' itself, so the entities below can never be mangled in transit
+const esc = (s) => String(s).replace(/&/g, '\x26amp;').replace(/</g, '\x26lt;').replace(/>/g, '\x26gt;').replace(/"/g, '\x26quot;');
 const gstRate = Number(row.gst_rate ?? 0.05);
 const holdRate = Number(row.retention_rate ?? 0.1);
 const net = 25000;
@@ -186,9 +187,12 @@ const page = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 return [{ json: { html: page } }];
 """
 
-CHOOSE_PAGE_JS = """// Confirmation page after a tap-to-choose POST.
+CHOOSE_PAGE_JS = """// Confirmation page after a tap-to-choose POST. Hands control back to the
+// app: an explicit "Back to the app" button (a click is always allowed) plus
+// a best-effort auto-redirect to the app scheme.
 const r = $input.first().json || {};
-const esc = (s) => String(s).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
+// \x26 = '&', so the entities can never be mangled in transit
+const esc = (s) => String(s).replace(/&/g, '\x26amp;').replace(/</g, '\x26lt;').replace(/>/g, '\x26gt;');
 const ok = r.outcome === 'UPDATED';
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -196,15 +200,20 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <style>
   body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; background: #0f172a;
          color: #f8fafc; display: flex; min-height: 100vh; align-items: center; justify-content: center; margin: 0; }
-  div { background: #1e293b; padding: 28px 30px; border-radius: 12px; text-align: center; max-width: 420px; }
+  .box { background: #1e293b; padding: 26px 28px; border-radius: 12px; text-align: center; max-width: 420px; }
   h1 { font-size: 20px; margin: 0 0 8px; }
-  p { color: #94a3b8; font-size: 14px; margin: 0; line-height: 1.6; }
-</style></head><body><div>
+  p { color: #94a3b8; font-size: 14px; margin: 0 0 18px; line-height: 1.6; }
+  .btn { display: inline-block; background: #2563eb; color: #fff; text-decoration: none;
+         padding: 12px 22px; border-radius: 8px; font-weight: 600; font-size: 15px; }
+</style></head><body><div class="box">
 <h1>${ok ? 'Style set: ' + esc(r.template) : 'Unknown style'}</h1>
 <p>${ok
   ? 'New invoices will use the ' + esc(r.template) + ' layout. Already-issued invoices keep their original look.'
   : 'That style is not in the catalog. Go back and pick Classic, Modern or Compact.'}</p>
-</div></body></html>`;
+<a class="btn" href="openclaw://app">Back to the app</a>
+</div>
+${ok ? `<script>setTimeout(function () { try { window.location.href = 'openclaw://app'; } catch (e) {} }, 1200);</script>` : ''}
+</body></html>`;
 return [{ json: { html } }];
 """
 

@@ -85,6 +85,18 @@ def main() -> int:
     for key in ("classic", "modern", "compact"):
         assert f'value="{key}"' in html, f"choose button for {key}"
     assert "scroll-snap-type: x mandatory" in html, "swipeable rail CSS"
+    # srcdoc round-trip: every iframe must carry a COMPLETE document (a broken
+    # escape silently blanks the preview — the bug this test exists for).
+    import re as _re
+    srcdocs = _re.findall(r'<iframe srcdoc="([^"]*)"', html)
+    assert len(srcdocs) == 3, f"three srcdoc payloads, got {len(srcdocs)}"
+    for i, raw in enumerate(srcdocs):
+        decoded = (raw.replace("&quot;", '"').replace("&lt;", "<")
+                      .replace("&gt;", ">").replace("&amp;", "&"))
+        assert decoded.startswith("<!doctype html>"), f"card {i}: srcdoc not a full document"
+        assert "data-tpl=" in decoded, f"card {i}: template body missing in srcdoc"
+        assert "SAMPLE" in decoded, f"card {i}: sample invoice missing in srcdoc"
+        assert len(decoded) > 4000, f"card {i}: srcdoc suspiciously short ({len(decoded)} bytes)"
     assert "Current style" in html, "current badge"
     assert "SAMPLE" in html, "sample invoice marker"
     assert "data:image/svg+xml;base64,SGVsbG8=" in html, "logo in card renders"
@@ -134,6 +146,9 @@ def main() -> int:
     bad_page = run_node(NODES["Build Choice Page"]["parameters"]["jsCode"],
                         {"outcome": "INVALID_TEMPLATE", "template": None}, {})
     assert "Unknown style" in bad_page["html"], "INVALID page"
+    # hands control back to the app
+    for label, page in (("UPDATED", ok_page), ("INVALID", bad_page)):
+        assert "openclaw://app" in page["html"], f"{label} page: no app return link"
     print("choice pages: UPDATED + INVALID — OK")
 
     print("invoice-template-preview harness: ALL GREEN")
