@@ -10,6 +10,33 @@ open); text chat **excluded** (it already carries its own history via `chatId`);
 
 ---
 
+## 0. As built (2026-10-28) — what shipped and where it deviates
+
+Implemented as specified, plus the answers T1 was waiting for:
+
+- **T1 answered on a real call object**: `message.call.assistantOverrides.variableValues`
+  **does round-trip**, so report matching uses the injected `call_ref` (deterministic), with
+  company+time as a fallback only (`ended_reason` gets an `unmatched:` prefix when no pending
+  row exists). Transcripts on this account: median 343 chars, p90 1,632, max 4,143 — small
+  enough that a transcript tail beats adding `analysisPlan` (which is still unset, so `summary`
+  is empty; the injector prefers `summary` if Vapi ever starts producing one).
+- **Context shape**: `right(coalesce(summary, transcript), 900)`, 7-day window, `status='reported'`,
+  rows newer than 30 s excluded so an in-flight call is never injected as history.
+- **Retention**: workflow `voice-context-retention-001`, daily 03:30 — 10-day delete +
+  pending→abandoned after 6 h. Its SQL was executed against live Postgres inside a
+  ROLLBACK-wrapped transaction with three seeded rows (1 old deleted, 1 stale abandoned,
+  1 fresh kept).
+- **Side benefit**: non-report Vapi events now answer `{ok:true, ignored:true}` and skip the
+  company query and variables builder entirely, instead of running them ~37 times per call.
+- **Text chat** keeps its own thread (`previousChatId`) and now sends `recent_context: ''`
+  so the prompt never renders a literal placeholder.
+- **Tests**: `backend/n8n/test_voice_context_hook.py` (39 offline checks) and
+  `qa/voice_context_probe.py` (18 live checks, self-cleaning — leaves zero rows).
+- **Still unproven**: a real phone call start-to-finish; the live probe used synthetic
+  end-of-call reports. See the follow-up note below.
+
+---
+
 ## 1. What already works, so we build only the missing part
 
 | Layer | State | Where |

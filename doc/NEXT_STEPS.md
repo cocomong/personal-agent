@@ -1,3 +1,40 @@
+## DONE 2026-10-28 — voice context carryover (the assistant remembers the last call)
+The assistant used to start every voice call from zero: the call-start hook
+returned company variables only. Meanwhile Vapi was ALREADY POSTing each call's
+`end-of-call-report` to that same hook (assistant `serverUrl` is set,
+`serverMessages` unset -> Vapi's default set applies) and the hook discarded it
+— 1,398 hook runs in 7 days against 37 real calls, a 60-run sample decoding as
+27 `speech-update`, 26 `conversation-update`, 3 `status-update`, 2
+`end-of-call-report`.
+
+BUILT (db/0039 + 0040 verify, live): `voice_calls` table — `call_ref uuid`,
+status pending → reported | abandoned, transcript / messages / ended_reason /
+duration_seconds, 10-day retention.
+HOOK (backend/n8n/patch_voice_context.py, idempotent): routes on
+`body.message.type`. `end-of-call-report` → Extract → upsert, matched by the
+`call_ref` the hook injected into `assistantOverrides.variableValues` (Vapi
+echoes it back on `message.call` — confirmed on a real payload), idempotent on
+`vapi_call_id`, `unmatched:` prefix when no pending row exists. Call starts (no
+`message.type`) write a pending row and return `recent_context` = transcript
+tail (≤900 chars, 7-day window, reported rows only, excluding the last 30s so
+an in-flight call is never injected). Every other Vapi event now answers
+`{ok:true, ignored:true}` with NO database work instead of running the company
+query + variables builder ~37x per call.
+PROMPT: new RECENT CONTEXT section — use it to avoid re-asking, never read it
+aloud or quote it, never treat it as current truth without a tool call. Greeting
+deliberately unchanged (user decision).
+TEXT CHAT: unchanged in behaviour, but the chat proxy now sends
+`recent_context: ''` so the prompt never renders a literal placeholder (text
+continues its own thread via previousChatId).
+RETENTION: workflow `voice-context-retention-001`, daily 03:30 — deletes rows
+older than 10 days and flips pending rows older than 6h to `abandoned`.
+TESTS: backend/n8n/test_voice_context_hook.py (39 offline checks: routing,
+SQL params, the real jsCode against fixtures, idempotency) and
+qa/voice_context_probe.py (live E2E: start → report → re-delivery → context →
+ignored event → self-clean; leaves zero rows).
+Decision log: doc/VOICE_CONTEXT_DESIGN.md. NOT YET PROVEN: a real phone call
+start-to-finish (probe used synthetic reports).
+
 ## DONE 2026-10-25 — project soft delete + screen-off voice support
 SOFT DELETE (db/0033 + 0034 verify, live): `projects.deleted_at timestamptz`
 (NULL = active). A removed project keeps its row and every dependent invoice /
