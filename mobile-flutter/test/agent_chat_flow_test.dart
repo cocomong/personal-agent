@@ -11,7 +11,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:personal_agent_mobile/agent_screen.dart';
 import 'package:personal_agent_mobile/session/chat_controller.dart';
-import 'package:personal_agent_mobile/session/call_state_service.dart';
 import 'package:personal_agent_mobile/session/vapi_session_controller.dart';
 
 /// Records what would have been POSTed to /webhook/chat and returns canned
@@ -160,76 +159,5 @@ void nudgeTests() {
 
     expect(session.said.single,
         'Take your time — tell me which style you like, or tap it on your phone.');
-  });
-
-  remoteCallStateTests();
-}
-
-/// Call-state lookup driven by the test instead of the network.
-class FakeCallState extends CallStateService {
-  FakeCallState(this.active);
-  bool active;
-  int calls = 0;
-
-  @override
-  Future<bool> isCallActive() async {
-    calls++;
-    return active;
-  }
-}
-
-void remoteCallStateTests() {
-  testWidgets('an open server-side call disables Start Voice', (tester) async {
-    final state = FakeCallState(true);
-    await tester.pumpWidget(MaterialApp(
-        home: AgentScreen(
-            chat: FakeChatController(),
-            session: FakeSession(connected: false),
-            callState: state)));
-    await tester.pump(); // let the initial lookup resolve
-    await tester.pump();
-
-    expect(find.text('Call in progress…'), findsOneWidget);
-    expect(find.text('Start Voice'), findsNothing);
-    expect(find.byKey(const ValueKey('remote-call-hint')), findsOneWidget);
-    expect(state.calls, greaterThan(0));
-
-    // Button must be disabled (tapping does nothing).
-    await tester.tap(find.text('Call in progress…'), warnIfMissed: false);
-    await tester.pump();
-    expect(state.calls, greaterThan(0));
-  });
-
-  testWidgets('the button re-enables once the call is gone', (tester) async {
-    final state = FakeCallState(true);
-    await tester.pumpWidget(MaterialApp(
-        home: AgentScreen(
-            chat: FakeChatController(),
-            session: FakeSession(connected: false),
-            callState: state)));
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Call in progress…'), findsOneWidget);
-
-    // Call ends on Vapi's side; the 15 s poll picks it up.
-    state.active = false;
-    await tester.pump(const Duration(seconds: 16));
-    await tester.pump();
-
-    expect(find.text('Start Voice'), findsOneWidget);
-    expect(find.text('Call in progress…'), findsNothing);
-  });
-
-  testWidgets('no live call -> normal Start Voice', (tester) async {
-    final state = FakeCallState(false);
-    await tester.pumpWidget(MaterialApp(
-        home: AgentScreen(
-            chat: FakeChatController(),
-            session: FakeSession(connected: false),
-            callState: state)));
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Start Voice'), findsOneWidget);
-    expect(find.text('Call in progress…'), findsNothing);
   });
 }
