@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/transcript_entry.dart';
+import '../session/call_state_service.dart';
 import '../session/chat_controller.dart';
 import '../session/session_persistence.dart';
 import '../session/vapi_session_controller.dart';
@@ -11,7 +12,8 @@ import '../session/vapi_session_controller.dart';
 /// session (VapiSessionController), so the agent keeps context across
 /// speak-or-type turns.
 class AgentScreen extends StatefulWidget {
-  const AgentScreen({super.key, this.onSignOut, this.chat, this.session});
+  const AgentScreen(
+      {super.key, this.onSignOut, this.chat, this.session, this.callState});
 
   /// Optional: called when the user taps the sign-out button (auth gate).
   final VoidCallback? onSignOut;
@@ -22,6 +24,9 @@ class AgentScreen extends StatefulWidget {
   /// Optional: inject a VapiSessionController (test seam, same pattern as
   /// [chat]) — widget tests pass one wired to a fake Vapi client.
   final VapiSessionController? session;
+
+  /// Optional: inject the server-side call-state lookup (test seam).
+  final CallStateService? callState;
 
   @override
   State<AgentScreen> createState() => _AgentScreenState();
@@ -45,6 +50,16 @@ class _AgentScreenState extends State<AgentScreen>
   bool _nudgedThisExcursion = false;
   static const _nudgeDelay = Duration(seconds: 6);
 
+  /// A call that is still open on Vapi's side while this app has no live call
+  /// object (process restarted, or the WebRTC leg dropped). Starting another
+  /// would put a second assistant on the line, so Start Voice is disabled
+  /// until the server says the call is gone.
+  late final CallStateService _callState =
+      widget.callState ?? const CallStateService();
+  bool _remoteCallActive = false;
+  Timer? _callStatePoll;
+  static const _callStatePollInterval = Duration(seconds: 15);
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +67,23 @@ class _AgentScreenState extends State<AgentScreen>
     _session.addListener(_onSessionChanged);
     _session.onAgentTranscript = _onAgentTranscript;
     _restoreTranscript();
+    _refreshCallState();
+  }
+
+  /// Ask the backend whether a call is still open (see CallStateService).
+  /// While one is, poll until it closes so the button re-enables by itself.
+  Future<void> _refreshCallState() async {
+    if (_session.isConnected) {
+      if (_remoteCallActive) setState(() => _remoteCallActive = false);
+      return;
+    }
+    final active = await _callState.isCallActive();
+    if (!mounted) return;
+    if (active != _remoteCallActive) setState(() => _remoteCallActive = active);
+    _callStatePoll?.cancel();
+    if (active) {
+      _callStatePoll = Timer(_callStatePollInterval, _refreshCallState);
+    }
   }
 
   @override
@@ -61,6 +93,7 @@ class _AgentScreenState extends State<AgentScreen>
     } else if (state == AppLifecycleState.resumed) {
       _nudgeTimer?.cancel();
       _nudgedThisExcursion = false;
+      _refreshCallState();
     }
   }
 
@@ -109,8 +142,8 @@ class _AgentScreenState extends State<AgentScreen>
           const TranscriptEntry(
             id: 'sys-restore',
             role: 'system',
-            text: 'Conversation restored · the previous voice call ended when '
-                'the app was closed. Tap Start Voice to continue.',
+            text: 'Conversation restored · the previous voice call is no longer '
+                'connected to this app.',
             isVoice: false,
           ),
         );
@@ -122,6 +155,7 @@ class _AgentScreenState extends State<AgentScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _nudgeTimer?.cancel();
+    _callStatePoll?.cancel();
     _draftController.dispose();
     _session.removeListener(_onSessionChanged);
     _session.dispose();
@@ -147,6 +181,7 @@ class _AgentScreenState extends State<AgentScreen>
   }
 
   Future<void> _toggleVoice() async {
+    if (_remoteCallActive) return; // still open on the server
     if (_session.isConnected) {
       await _session.stop();
       return;
@@ -226,20 +261,48 @@ class _AgentScreenState extends State<AgentScreen>
   Widget _buildVoiceButton() {
     final connected = _session.isConnected;
     final connecting = _session.status == SessionStatus.connecting;
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton(
-        style: FilledButton.styleFrom(
-          backgroundColor: connected ? const Color(0xFFDC2626) : const Color(0xFF2563EB),
-          padding: const EdgeInsets.symmetric(vertical: 16),
+    final blockedByRemote = _remoteCallActive && !connected && !connecting;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (blockedByRemote)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'A voice call on this account is still open — it will close on '
+              'its own in a moment.',
+              key: ValueKey('remote-call-hint'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: Color(0xFF94A3B8), fontSize: 12, height: 1.35),
+            ),
+          ),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor:
+                  blockedByRemote ? const Color(0xFF475569) : connected ? const Color(0xFFDC2626) : const Color(0xFF2563EB),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            // Disabled while connecting so a second tap can't even queue up;
+            // the controller's single-flight guard is the real defense, this
+            // is defense in depth. Also disabled while a call is still open on
+            // the server but not attached to this app (would be a 2nd call).
+            onPressed: connecting || blockedByRemote ? null : _toggleVoice,
+            child: Text(
+                blockedByRemote
+                    ? 'Call in progress…'
+                    : connecting
+                        ? 'Connecting…'
+                        : connected
+                            ? 'End Voice'
+                            : 'Start Voice',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          ),
         ),
-        // Disabled while connecting so a second tap can't even queue up;
-        // the controller's single-flight guard is the real defense, this is
-        // defense in depth.
-        onPressed: connecting ? null : _toggleVoice,
-        child: Text(connecting ? 'Connecting…' : connected ? 'End Voice' : 'Start Voice',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-      ),
+      ],
     );
   }
 

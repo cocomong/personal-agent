@@ -1,0 +1,172 @@
+{
+ "name": "Call State (is a Vapi call still open?)",
+ "id": "call-state-001",
+ "nodes": [
+  {
+   "id": "cs-0001",
+   "name": "Call State Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    0,
+    300
+   ],
+   "webhookId": "c5a1e9d2-0000-4c55-9d10-callstate01",
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "call/state",
+    "responseMode": "responseNode",
+    "options": {}
+   }
+  },
+  {
+   "id": "cs-0002",
+   "name": "Resolve Token",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    220,
+    300
+   ],
+   "parameters": {
+    "jsCode": "// Resolve the caller from X-User-Token (HMAC v1 token), same scheme as the\n// chat proxy. No/invalid token -> uid null -> 401 below.\nconst crypto = require('crypto');\nconst req = $input.first().json || {};\nconst headers = req.headers || {};\nconst token = String(headers['x-user-token'] || headers['X-User-Token'] || '').trim();\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nlet uid = null;\nif (token && secret) {\n  try {\n    const parts = token.split('.');\n    if (parts.length === 3 && parts[0] === 'v1') {\n      const payloadB64 = parts[1];\n      const expected = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url');\n      const a = Buffer.from(parts[2]); const b = Buffer.from(expected);\n      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {\n        const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());\n        if (payload.uid && payload.exp * 1000 > Date.now()) uid = payload.uid;\n      }\n    }\n  } catch (e) { uid = null; }\n}\nreturn [{ json: { uid } }];\n"
+   }
+  },
+  {
+   "id": "cs-0003",
+   "name": "Token OK?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2,
+   "position": [
+    440,
+    300
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "chat-ok",
+       "leftValue": "={{ $json.uid }}",
+       "rightValue": "",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "cs-0004",
+   "name": "Query Vapi Calls",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    660,
+    200
+   ],
+   "parameters": {
+    "jsCode": "// Ask Vapi whether this assistant still has an in-progress call. The private\n// key never leaves the server. Web-call statuses: queued | ringing |\n// in-progress | forwarding | ended.\nconst https = require('https');\nconst assistantId = String($env.VAPI_ASSISTANT_ID || '').trim();\nconst key = String($env.VAPI_PRIVATE_KEY || '').trim();\n\nfunction get(url) {\n  return new Promise((resolve, reject) => {\n    const req = https.request(url, { method: 'GET', headers: {\n      'Authorization': 'Bearer ' + key,\n      'User-Agent': 'curl/8.5.0',\n      'Accept': 'application/json',\n    } }, (res) => {\n      let data = '';\n      res.on('data', (c) => (data += c));\n      res.on('end', () => resolve({ status: res.statusCode, body: data }));\n    });\n    req.on('error', reject);\n    req.end();\n  });\n}\n\nasync function run() {\n  if (!key || !assistantId) return { active: false, reason: 'vapi not configured' };\n  let r;\n  try {\n    r = await get(`https://api.vapi.ai/call?assistantId=${encodeURIComponent(assistantId)}&limit=10`);\n  } catch (e) {\n    return { active: false, reason: 'vapi unreachable: ' + e.message };\n  }\n  if (r.status !== 200) return { active: false, reason: 'vapi ' + r.status };\n  let calls;\n  try {\n    calls = JSON.parse(r.body);\n  } catch (e) {\n    return { active: false, reason: 'vapi returned non-JSON' };\n  }\n  if (!Array.isArray(calls)) calls = calls.results || calls.data || [];\n  const live = calls.filter((c) => c && c.status === 'in-progress');\n  const c = live[0];\n  if (!c) return { active: false };\n  return {\n    active: true,\n    callId: c.id || null,\n    startedAt: c.startedAt || c.createdAt || null,\n    type: c.type || null,\n  };\n}\n\nreturn run().then((out) => [{ json: out }]);\n"
+   }
+  },
+  {
+   "id": "cs-0005",
+   "name": "Respond State",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 2,
+   "position": [
+    880,
+    200
+   ],
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ { active: $json.active === true, callId: $json.callId ?? null, startedAt: $json.startedAt ?? null, type: $json.type ?? null, reason: $json.reason ?? null } }}",
+    "options": {
+     "responseCode": 200
+    }
+   }
+  },
+  {
+   "id": "cs-0006",
+   "name": "Respond Unauthorized",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 2,
+   "position": [
+    660,
+    420
+   ],
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ { active: false, reason: 'unauthorized' } }}",
+    "options": {
+     "responseCode": 401
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Call State Webhook": {
+   "main": [
+    [
+     {
+      "node": "Resolve Token",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Resolve Token": {
+   "main": [
+    [
+     {
+      "node": "Token OK?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Token OK?": {
+   "main": [
+    [
+     {
+      "node": "Query Vapi Calls",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Respond Unauthorized",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Query Vapi Calls": {
+   "main": [
+    [
+     {
+      "node": "Respond State",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ }
+}
