@@ -82,6 +82,7 @@ def main() -> int:
 
     db(f"DELETE FROM voice_calls WHERE vapi_call_id LIKE 'qa-probe-%' OR transcript LIKE '%{MARKER}%'")
     call_id = f"qa-probe-{int(time.time())}"
+    refs = []   # every call_ref this run created, so cleanup cannot leak a pending row
 
     try:
         print("1) call start")
@@ -95,6 +96,7 @@ def main() -> int:
         check(vv.get("company_name") == "Ireh Construction", "company variables unchanged",
               str(vv.get("company_name")))
         check(bool(ov.get("firstMessage")), "greeting unchanged")
+        refs.append(ref)
         check(db(f"SELECT status FROM voice_calls WHERE call_ref = '{ref}'") == "pending",
               "pending row written for call_ref")
 
@@ -127,6 +129,8 @@ def main() -> int:
         print("\n4) next call start sees the context")
         status, body = post({}, token)
         vv = (body.get("assistantOverrides") or {}).get("variableValues") or {}
+        if vv.get("call_ref"):
+            refs.append(vv["call_ref"])   # this probe start leaves a pending row too
         ctx = vv.get("recent_context") or ""
         check(MARKER in ctx, "recent_context carries the transcript tail", ctx[:120])
         check("customer ended call" in ctx, "ended reason humanised", ctx[:120])
@@ -142,8 +146,14 @@ def main() -> int:
     finally:
         print("\n6) cleanup")
         db(f"DELETE FROM voice_calls WHERE vapi_call_id LIKE 'qa-probe-%' OR transcript LIKE '%{MARKER}%'")
-        left = db(f"SELECT count(*) FROM voice_calls WHERE transcript LIKE '%{MARKER}%'")
-        check(left == "0", "probe rows removed (the PM's next call cannot inherit QA text)")
+        if refs:
+            in_list = ",".join(f"'{r}'::uuid" for r in refs)
+            db(f"DELETE FROM voice_calls WHERE call_ref IN ({in_list})")
+            left = db(f"SELECT count(*) FROM voice_calls WHERE call_ref IN ({in_list})")
+            check(left == "0", "pending rows created by this probe removed",
+                  f"{left} left")
+        check(db(f"SELECT count(*) FROM voice_calls WHERE transcript LIKE '%{MARKER}%'") == "0",
+              "probe rows removed (the PM's next call cannot inherit QA text)")
 
     print()
     if failures:
