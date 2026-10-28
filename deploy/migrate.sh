@@ -52,6 +52,7 @@ MIGRATIONS=(
   0033_projects_soft_delete.sql
   0035_company_logo.sql
   0037_invoice_templates.sql
+  0039_voice_context.sql
 )
 
 VERIFY=(
@@ -67,6 +68,7 @@ VERIFY=(
   0034_projects_soft_delete_verify.sql
   0036_company_logo_verify.sql
   0038_invoice_templates_verify.sql
+  0040_voice_context_verify.sql
 )
 
 echo "== Migrations =="

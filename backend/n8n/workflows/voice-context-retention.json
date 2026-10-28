@@ -1,0 +1,62 @@
+{
+ "name": "Voice Context Retention (10 days)",
+ "id": "voice-context-retention-001",
+ "nodes": [
+  {
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "cronExpression",
+       "expression": "30 3 * * *"
+      }
+     ]
+    }
+   },
+   "id": "vcr-0001",
+   "name": "Daily 03:30",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.1,
+   "position": [
+    0,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH del AS (\n  DELETE FROM voice_calls\n   WHERE created_at < now() - interval '10 days'\n   RETURNING 1\n), aband AS (\n  UPDATE voice_calls\n     SET status = 'abandoned',\n         updated_at = now()\n   WHERE status = 'pending'\n     AND started_at < now() - interval '6 hours'\n   RETURNING 1\n)\nSELECT (SELECT count(*) FROM del)   AS deleted_old_rows,\n       (SELECT count(*) FROM aband) AS abandoned_pending_rows;",
+    "options": {}
+   },
+   "id": "vcr-0002",
+   "name": "Exec: prune voice_calls",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.4,
+   "position": [
+    220,
+    0
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+     "name": "Supabase PostgreSQL"
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Daily 03:30": {
+   "main": [
+    [
+     {
+      "node": "Exec: prune voice_calls",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {},
+ "active": true
+}
