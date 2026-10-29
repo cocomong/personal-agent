@@ -1,3 +1,28 @@
+## DONE 2026-10-30 — new Google sign-in goes through setup (and gets its own company)
+Before: a stranger signing in with Google was resolved to company 1 by
+`COALESCE(users.company_id, 1)`, so they landed inside Ireh Construction with full access
+and the setup conversation never ran (the prompt read Ireh's `setup_complete = true`).
+
+NOW (live, verified by qa/onboarding_probe.py):
+- Three-way scope in the hook and the gateway: user+company -> that company; user with no
+  company -> NULL (onboarding); no token -> legacy company 1 only.
+- `complete_onboarding` creates the company server-side (all tenant columns explicit;
+  db/0042 dropped the per-tenant defaults that would have cloned Ireh's identity), links
+  the user, and refuses to complete setup without a business address.
+- db/0041: owner (dtam2003@gmail.com) bound to company 1; 5650tam@gmail.com removed.
+- Gateway guard: with no company only get_onboarding_status + complete_onboarding pass.
+  Every data tool is refused (no SQL runs) until setup is done.
+- P1: all 43 tenant-facing SQL nodes are company-scoped; db/0043 adds company_id to the
+  four views and adds fn_run_payroll_for_company(). Cross-tenant isolation tested both
+  ways: the new tenant sees only its own rows, the owner never sees the tenant's.
+- App: SetupScreen + three-state gate (no session / setup / assistant), setup call
+  auto-starts, `POST /webhook/auth/me` refreshes setup_complete on resume or on demand.
+TESTS: backend/n8n/test_onboarding_scope.py, qa/onboarding_scope_db_test.py (rolled back),
+qa/onboarding_probe.py (live, self-cleaning), flutter analyze + 15 widget tests.
+NOT VERIFIED: no ADB device was attached, so the setup screen has not been seen on the
+phone; the whole flow is proven at the HTTP/DB level only.
+DECISION LOG: doc/PLAN_NEW_USER_ONBOARDING.md section 8.
+
 ## DONE 2026-10-28 — voice context carryover (the assistant remembers the last call)
 The assistant used to start every voice call from zero: the call-start hook
 returned company variables only. Meanwhile Vapi was ALREADY POSTing each call's

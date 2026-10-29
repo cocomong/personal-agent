@@ -59,6 +59,44 @@ class AuthService {
     return session;
   }
 
+  /// Re-reads the user from the backend (`POST /webhook/auth/me`).
+  ///
+  /// The cached `setup_complete` flag goes stale the moment setup finishes in a
+  /// call or on another device; this is how the gate learns about it. Returns
+  /// null when the token is no longer valid (the session is cleared then).
+  Future<AuthSession?> refreshSession() async {
+    final current = SessionStore.instance.session;
+    if (current == null) return null;
+    final resp = await http
+        .post(
+          Uri.parse('$n8nBaseUrl/webhook/auth/me'),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Token': current.token,
+          },
+          body: '{}',
+        )
+        .timeout(const Duration(seconds: 10));
+    if (resp.statusCode == 401) {
+      await SessionStore.instance.clear();
+      return null;
+    }
+    if (resp.statusCode != 200) return current;
+
+    final body = jsonDecode(resp.body) as Map<String, dynamic>;
+    final user = (body['user'] as Map<String, dynamic>?) ?? const {};
+    final updated = AuthSession(
+      token: current.token,
+      userId: (user['id'] as String?) ?? current.userId,
+      name: (user['name'] as String?) ?? current.name,
+      email: (user['email'] as String?) ?? current.email,
+      companyId: (user['company_id'] as num?)?.toInt() ?? current.companyId,
+      setupComplete: user['setup_complete'] == true,
+    );
+    await SessionStore.instance.save(updated);
+    return updated;
+  }
+
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await SessionStore.instance.clear();

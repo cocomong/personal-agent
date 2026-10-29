@@ -215,9 +215,10 @@ Endpoints that honor it:
 - POST /webhook/device/register  (Step 1: tie device to user; fallback to single-tenant)
 - POST /webhook/voice/gateway  (Step 3: scope every tool query by company_id)
 
-Fallback rule (keeps old behavior while migrating): missing/invalid token -> act as the
-legacy single-tenant user (company id=1). This is temporary and removed once the app is
-login-gated.
+Fallback rule (as implemented 2026-10-30): a MISSING/invalid token -> legacy single-tenant
+user (company id=1). A VALID token whose user has no company -> NULL scope (onboarding),
+never company 1. The legacy branch stays for web chat / pre-login builds and is the only
+remaining single-tenant path.
 
 ### 4.3 Hook contract (unchanged, now per-company)
 
@@ -270,9 +271,27 @@ login-gated.
       `ON CONFLICT (company_id, worker_code)` with a `::text` LPAD arg; workflow redeployed (active).
       NOTE: 0013(a) "company_profile has exactly 1 row" assertion must be relaxed when Step 3 starts
       creating companies (0013/0020 live runs are clean today).
-- [ ] Step 3 — SCOPED SERVICE: hook returns caller's company; gateway tools filter by
-      company_id; complete_onboarding CREATES company_profile + links user; views/functions
-      per 3.4; remove single-tenant fallback.
+- [x] Step 3 — SCOPED SERVICE (DONE + verified live 2026-10-30):
+      hook resolves a THREE-WAY scope (valid token + company -> that company; valid token,
+      no company -> NULL "onboarding"; no/invalid token -> legacy company 1). The old
+      `COALESCE(users.company_id, 1)` is gone: that fallback is what silently turned every
+      new sign-in into Ireh Construction.
+      `complete_onboarding` now CREATES company_profile (server-side, every tenant column
+      explicit — db/0042 dropped the defaults that carried Ireh's name/address/phone/email)
+      and links users.company_id; db/0041 binds the owner account to company 1 and removed
+      the second account (user decision). Setup cannot complete without a business address
+      (db/0042 CHECK + tool-level gate), so a tenant can never invoice without one.
+      Gateway: `Extract Tool Call` -> `Resolve Call Scope` -> `Normalize Tool Call` ->
+      `Onboarding Guard`. Identity rides in `assistantOverrides.variableValues.user_id`
+      (proven round-trip); metadata.userId is the fallback. All 43 tenant-facing SQL nodes
+      are company-scoped (db/0043 adds company_id to the 4 views and adds
+      `fn_run_payroll_for_company`). With no company yet, ONLY get_onboarding_status and
+      complete_onboarding are allowed — everything else is refused without touching the DB.
+      `/webhook/auth/me` (auth-me-001) refreshes setup_complete for the app gate.
+      App: `SetupScreen` + three-state gate; a new user's first call auto-starts in setup.
+      Verified: backend/n8n/test_onboarding_scope.py (offline), qa/onboarding_scope_db_test.py
+      (rolled-back DB), qa/onboarding_probe.py (live: onboarding, cross-tenant isolation both
+      ways, company 1 byte-identical). NOT YET VERIFIED ON A DEVICE.
 - [ ] Step 4 — STORE POLISH: real release keystore; runtime-config base URLs; app icon;
       privacy policy; Play Console listing.
 

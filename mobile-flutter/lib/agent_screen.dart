@@ -11,7 +11,13 @@ import '../session/vapi_session_controller.dart';
 /// session (VapiSessionController), so the agent keeps context across
 /// speak-or-type turns.
 class AgentScreen extends StatefulWidget {
-  const AgentScreen({super.key, this.onSignOut, this.chat, this.session});
+  const AgentScreen({
+    super.key,
+    this.onSignOut,
+    this.chat,
+    this.session,
+    this.autoStart = false,
+  });
 
   /// Optional: called when the user taps the sign-out button (auth gate).
   final VoidCallback? onSignOut;
@@ -22,6 +28,11 @@ class AgentScreen extends StatefulWidget {
   /// Optional: inject a VapiSessionController (test seam, same pattern as
   /// [chat]) — widget tests pass one wired to a fake Vapi client.
   final VapiSessionController? session;
+
+  /// Start the voice session as soon as the screen appears. Used by the setup
+  /// gate: the first-run conversation IS the setup, so the user should not have
+  /// to find a button to begin it.
+  final bool autoStart;
 
   @override
   State<AgentScreen> createState() => _AgentScreenState();
@@ -52,6 +63,14 @@ class _AgentScreenState extends State<AgentScreen>
     _session.addListener(_onSessionChanged);
     _session.onAgentTranscript = _onAgentTranscript;
     _restoreTranscript();
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_session.status == SessionStatus.disconnected) {
+          unawaited(_session.start().catchError((_) {}));
+        }
+      });
+    }
   }
 
   @override

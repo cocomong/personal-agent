@@ -8,6 +8,7 @@ import 'agent_screen.dart';
 import 'auth/auth_service.dart';
 import 'auth/login_screen.dart';
 import 'auth/session_store.dart';
+import 'auth/setup_screen.dart';
 import 'notifications/fcm_service.dart';
 import 'notifications/notification_service.dart';
 
@@ -83,33 +84,88 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   AuthSession? _session;
   bool _restoring = true;
+
+  /// True once the setup conversation has been started from the setup gate.
+  bool _setupStarted = false;
+  bool _refreshing = false;
+  String? _refreshError;
 
   @override
   void initState() {
     super.initState();
-    SessionStore.instance.restore().then((s) {
+    WidgetsBinding.instance.addObserver(this);
+    SessionStore.instance.restore().then((s) async {
+      // A cached flag can be stale (setup finished in a call or elsewhere).
+      AuthSession? fresh = s;
+      if (s != null && !s.setupComplete) {
+        fresh = await AuthService.instance.refreshSession() ?? s;
+      }
       if (!mounted) return;
       setState(() {
-        _session = s;
+        _session = fresh;
         _restoring = false;
       });
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshSession(silent: true));
+    }
+  }
+
+  /// Ask the backend who we are now. Flips the gate when setup has completed.
+  Future<void> _refreshSession({bool silent = false}) async {
+    if (_session == null) return;
+    if (!silent) setState(() => _refreshing = true);
+    try {
+      final fresh = await AuthService.instance.refreshSession();
+      if (!mounted) return;
+      setState(() {
+        _refreshError = null;
+        _session = fresh;
+      });
+      if (!silent) {
+        setState(() => _refreshing = false);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      if (!silent) {
+        setState(() {
+          _refreshing = false;
+          _refreshError = 'Could not reach the server. Check your connection.';
+        });
+      }
+    }
   }
 
   void _onSignedIn(AuthSession session) {
     // Device was registered pre-login without identity; re-register so the
     // backend can associate the FCM token with this user/company.
     unawaited(FcmService.instance.registerAfterLogin());
-    setState(() => _session = session);
+    setState(() {
+      _session = session;
+      _setupStarted = false;
+    });
   }
 
   Future<void> _onSignOut() async {
     await AuthService.instance.signOut();
     if (!mounted) return;
-    setState(() => _session = null);
+    setState(() {
+      _session = null;
+      _setupStarted = false;
+    });
   }
 
   @override
@@ -126,6 +182,22 @@ class _AuthGateState extends State<AuthGate> {
     if (session == null) {
       return LoginScreen(onSignedIn: _onSignedIn);
     }
-    return AgentScreen(onSignOut: _onSignOut);
+
+    // A user with no company yet must go through setup before the assistant
+    // can do anything: the backend refuses every data tool until then.
+    if (!session.setupComplete && !_setupStarted) {
+      return SetupScreen(
+        onStartSetup: () => setState(() => _setupStarted = true),
+        onSignOut: _onSignOut,
+        onRefresh: _refreshSession,
+        refreshing: _refreshing,
+        error: _refreshError,
+      );
+    }
+
+    return AgentScreen(
+      onSignOut: _onSignOut,
+      autoStart: !session.setupComplete,
+    );
   }
 }

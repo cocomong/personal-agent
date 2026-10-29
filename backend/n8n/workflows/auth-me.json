@@ -1,0 +1,114 @@
+{
+  "id": "auth-me-001",
+  "name": "Auth Me (session refresh)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auth/me",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "me-0001",
+      "name": "Auth Me Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "auth-me"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify the HMAC session token issued by /webhook/auth/google.\n// Format: v1.<payload-b64url>.<sig-b64url>, payload { uid, exp }.\nconst crypto = require('crypto');\nconst req = $input.first().json || {};\nconst headers = req.headers || {};\nconst token = String(headers['x-user-token'] || headers['X-User-Token'] || '').trim();\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nlet uid = '';\nif (token && secret) {\n  try {\n    const parts = token.split('.');\n    if (parts.length === 3 && parts[0] === 'v1') {\n      const payloadB64 = parts[1];\n      const expected = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url');\n      const a = Buffer.from(parts[2]);\n      const b = Buffer.from(expected);\n      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {\n        const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());\n        if (payload.uid && payload.exp * 1000 > Date.now()) uid = String(payload.uid);\n      }\n    }\n  } catch (e) {\n    uid = '';\n  }\n}\nreturn [{ json: { uid } }];"
+      },
+      "id": "me-0002",
+      "name": "Verify Session Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "has-uid",
+              "leftValue": "={{ $json.uid }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "me-0003",
+      "name": "Valid Session?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT u.id, u.name, u.email, u.company_id,\n       COALESCE(cp.setup_completed_at IS NOT NULL, false) AS setup_complete,\n       COALESCE(cp.company_name, '') AS company_name\n  FROM users u\n  LEFT JOIN company_profile cp ON cp.id = u.company_id\n WHERE u.id = NULLIF(btrim($1::text), '')::uuid;",
+        "options": { "queryReplacement": "={{ [$('Verify Session Token').first().json.uid] }}" }
+      },
+      "id": "me-0004",
+      "name": "Load User",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [660, 0],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { token_ok: true, user: { id: $json.id, name: $json.name, email: $json.email, company_id: $json.company_id, company_name: $json.company_name, setup_complete: $json.setup_complete } } }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "me-0005",
+      "name": "Respond Me",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { token_ok: false, error: 'AUTH_INVALID_TOKEN' } }}",
+        "options": { "responseCode": 401 }
+      },
+      "id": "me-0006",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 200]
+    }
+  ],
+  "connections": {
+    "Auth Me Webhook": {
+      "main": [[{ "node": "Verify Session Token", "type": "main", "index": 0 }]]
+    },
+    "Verify Session Token": {
+      "main": [[{ "node": "Valid Session?", "type": "main", "index": 0 }]]
+    },
+    "Valid Session?": {
+      "main": [
+        [{ "node": "Load User", "type": "main", "index": 0 }],
+        [{ "node": "Respond Unauthorized", "type": "main", "index": 0 }]
+      ]
+    },
+    "Load User": {
+      "main": [[{ "node": "Respond Me", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

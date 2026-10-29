@@ -483,8 +483,26 @@ def main():
         for e in errs:
             print("FAIL:", e)
         return 1
+    # Compose with the newer onboarding-scope patch (2026-10-30): that script owns
+    # read_setup_status, start_call_row and the scope variables in Build Hook
+    # Variables. Re-applying it here keeps this patcher re-runnable without
+    # silently reverting per-user company scope.
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "patch_onboarding_scope", os.path.join(HERE, "patch_onboarding_scope.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        wf_copy = json.loads(json.dumps(wf))
+        mod.patch_hook(wf_copy)   # mutates in place; returns the change list
+        wf = wf_copy
+        indent = 2
+    except Exception as exc:  # never make the voice-context patch unrunnable
+        print(f"WARN: onboarding-scope compose skipped: {exc}")
+        indent = 1
+
     with open(WF, "w") as fh:
-        json.dump(wf, fh, indent=1)
+        json.dump(wf, fh, indent=indent, ensure_ascii=False)
         fh.write("\n")
     print(f"patched {WF}")
     for n in wf["nodes"]:

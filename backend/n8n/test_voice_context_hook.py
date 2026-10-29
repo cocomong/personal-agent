@@ -29,7 +29,9 @@ const payload = JSON.parse(process.env.FIXTURE || '{}');
 const nodeOutputs = JSON.parse(process.env.NODE_OUTPUTS || '{}');
 const $input = { first: () => ({ json: payload }), all: () => [{ json: payload }] };
 const $env = { AUTH_TOKEN_SECRET: 'test-secret' };
-const $ = (name) => ({ first: () => ({ json: nodeOutputs[name] || {} }) });
+// Fall back to the fixture payload: Build Hook Variables reads the setup row by
+// node name, and most fixtures supply it as the input item.
+const $ = (name) => ({ first: () => ({ json: nodeOutputs[name] || payload }) });
 const fn = new Function('$input', '$env', '$', 'return (async () => {' + code + '})();');
 fn($input, $env, $)
   .then((r) => { process.stdout.write(JSON.stringify(r)); })
@@ -93,8 +95,13 @@ def main():
           "call-start branch -> Resolve Company Scope")
     check([c["node"] for c in conns["Call Start Or Event?"]["main"][1]] == ["Respond Event (ignored)"],
           "ignored events -> Respond (no DB work)")
-    check(conns["Resolve Company Scope"]["main"][0][0]["node"] == "Exec: start_call_row",
-          "call start writes the pending row BEFORE reading setup status")
+    # Order changed 2026-10-30: the caller's company is resolved first (it can be
+    # NULL for a new user), then the pending row is created only when a company
+    # exists. See backend/n8n/test_onboarding_scope.py.
+    check(conns["Resolve Company Scope"]["main"][0][0]["node"] == "Exec: read_setup_status",
+          "call start resolves the company scope before anything is written")
+    check(conns["Exec: read_setup_status"]["main"][0][0]["node"] == "Exec: start_call_row",
+          "pending row is written after the scope is known")
     check("Exec: start_call_row" not in
           [c["node"] for c in conns["Route By Event Type"]["main"][0]],
           "report branch never writes a pending row")
@@ -111,7 +118,8 @@ def main():
     start_sql = node(wf, "Exec: start_call_row")["parameters"]["query"]
     check("INSERT INTO voice_calls" in start_sql and "gen_random_uuid()" in start_sql,
           "pending insert creates call_ref")
-    check(start_sql.count("$1") == 1, "pending insert takes exactly the uid param")
+    check(start_sql.count("$1") == 1 and start_sql.count("$2") == 0,
+          "pending insert takes the company id only (uid used upstream)")
     read_sql = node(wf, "Exec: read_setup_status")["parameters"]["query"]
     check("right(COALESCE(vc.summary, vc.transcript), 900)" in read_sql, "context is capped at 900 chars")
     check("interval '7 days'" in read_sql, "context window is 7 days")
