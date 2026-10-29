@@ -1,3 +1,26 @@
+## DONE 2026-10-30 — invoice dates + push ownership
+Two defects reported from two phones:
+
+1. **Dates.** Draft previews printed raw ISO timestamps (`2026-10-29T07:00:00.000Z`) because
+   the renderer passed the `date` column through untouched. `fmtDate()` now formats the
+   Y-M-D prefix as `Oct 29, 2026` (no timezone maths — a date at 00:00Z would otherwise
+   print the previous day). It is emitted by `patch_invoice_template.py` for all three
+   render nodes and by `patch_document_dates.py` for the receipt and the template-chooser
+   sample.
+2. **Push reaching the wrong phone.** `device_tokens` had no `user_id`, registration ignored
+   the caller's session token, and sign-out never unregistered — so every phone ever used
+   stayed a company-1 push target (6 rows, including a second phone and four from August).
+   Now: `db/0044` adds `device_tokens.user_id` and clears the unowned rows; registration
+   requires a session, binds `user_id` + the caller's company, re-homes a token when a
+   phone signs in as someone else, and stores nothing for a user mid-setup;
+   `POST /webhook/device/unregister` (new workflow) removes the caller's own row and is
+   called from `signOut()` before the session is cleared.
+TESTS: `backend/n8n/test_document_dates.py`, `qa/device_owner_probe.py` (live),
+plus the onboarding suites re-run green.
+DEVICE STEP OUTSTANDING: install the new APK and open it once per phone (that is what
+re-registers a token now that the old rows were cleared), then verify the second phone is
+silent after sign-out.
+
 ## DONE 2026-10-30 — new Google sign-in goes through setup (and gets its own company)
 Before: a stranger signing in with Google was resolved to company 1 by
 `COALESCE(users.company_id, 1)`, so they landed inside Ireh Construction with full access

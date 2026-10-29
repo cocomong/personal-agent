@@ -49,6 +49,32 @@ class FcmService {
     }
   }
 
+  /// Removes this phone's push registration for the CURRENT session, so a
+  /// signed-out phone stops receiving the company's notifications.
+  ///
+  /// Best-effort: the caller signs out regardless. Must run BEFORE the session
+  /// token is cleared, because the backend authorises the delete with it.
+  Future<void> unregisterDevice() async {
+    final fcmToken = _fcmToken;
+    final sessionToken = SessionStore.instance.token;
+    if (fcmToken == null || fcmToken.isEmpty) return;
+    if (sessionToken == null || sessionToken.isEmpty) return;
+    try {
+      await http
+          .post(
+            Uri.parse('$n8nBaseUrl/webhook/device/unregister'),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-Token': sessionToken,
+            },
+            body: jsonEncode({'token': fcmToken}),
+          )
+          .timeout(const Duration(seconds: 8));
+    } catch (e) {
+      debugPrint('unregister_device failed: $e');
+    }
+  }
+
   /// Re-registers the device AFTER sign-in, so the backend can associate the
   /// FCM token with the authenticated user (device_tokens -> company).
   Future<void> registerAfterLogin() async {

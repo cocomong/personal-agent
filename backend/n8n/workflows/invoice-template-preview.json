@@ -1,434 +1,434 @@
 {
- "name": "Invoice Template Preview",
- "id": "tplPreview-001",
- "nodes": [
-  {
-   "id": "tpl-0001",
-   "name": "Preview Webhook",
-   "type": "n8n-nodes-base.webhook",
-   "typeVersion": 2,
-   "position": [
-    0,
-    300
-   ],
-   "webhookId": "a1f3c0de-0000-4a5b-9c1d-tplprev0001",
-   "parameters": {
-    "httpMethod": "GET",
-    "path": "invoice-template-preview",
-    "responseMode": "responseNode",
-    "options": {}
-   }
-  },
-  {
-   "parameters": {
-    "jsCode": "// Verify the template-preview signature: `${company}.template-preview.${exp}`.\nconst crypto = require('crypto');\nconst q = $input.first().json.query || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst company = String(q.company || '');\nconst exp = String(q.exp || '');\nconst sig = String(q.sig || '');\nlet ok = false;\nif (secret && company && exp && sig) {\n  const expected = crypto.createHmac('sha256', secret).update(`${company}.template-preview.${exp}`).digest('base64url');\n  const a = Buffer.from(sig); const b = Buffer.from(expected);\n  if (a.length === b.length && crypto.timingSafeEqual(a, b) && Number(exp) * 1000 > Date.now()) ok = true;\n}\nreturn [{ json: { ok, company } }];\n"
-   },
-   "id": "tpl-0002",
-   "name": "Verify Preview Sig",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    220,
-    300
-   ]
-  },
-  {
-   "id": "tpl-0003",
-   "name": "Preview Sig OK?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2,
-   "position": [
-    440,
-    300
-   ],
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "loose",
-      "version": 2
-     },
-     "conditions": [
-      {
-       "id": "sig-ok",
-       "leftValue": "={{ $json.ok }}",
-       "rightValue": true,
-       "operator": {
-        "type": "boolean",
-        "operation": "equals"
-       }
+  "name": "Invoice Template Preview",
+  "id": "tplPreview-001",
+  "nodes": [
+    {
+      "id": "tpl-0001",
+      "name": "Preview Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "a1f3c0de-0000-4a5b-9c1d-tplprev0001",
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "invoice-template-preview",
+        "responseMode": "responseNode",
+        "options": {}
       }
-     ],
-     "combinator": "and"
     },
-    "options": {}
-   }
-  },
-  {
-   "parameters": {
-    "operation": "executeQuery",
-    "query": "SELECT cp.id AS company_id, cp.company_name, cp.street_address, cp.city,\n       cp.province, cp.postal_code, cp.phone, cp.gst_reg_number, cp.pst_reg_number,\n       cp.brand_primary_color, cp.logo_data, cp.logo_content_type,\n       cp.payment_instructions, cp.gst_rate, cp.retention_rate,\n       COALESCE(cp.invoice_template_key, 'classic') AS selected_key,\n       (SELECT json_agg(json_build_object('key', t.key, 'display_name', t.display_name,\n                        'description', t.description, 'html', t.html) ORDER BY t.key)\n          FROM document_templates t WHERE t.is_active) AS templates\n  FROM company_profile cp\n WHERE cp.id = $1::smallint;",
-    "options": {
-     "queryReplacement": "={{ [Number($json.company) || 1] }}"
-    }
-   },
-   "id": "tpl-0004",
-   "name": "Load Company + Catalog",
-   "type": "n8n-nodes-base.postgres",
-   "typeVersion": 2.5,
-   "position": [
-    660,
-    200
-   ],
-   "credentials": {
-    "postgres": {
-     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-     "name": "Supabase PostgreSQL"
-    }
-   }
-  },
-  {
-   "parameters": {
-    "jsCode": "// Build the side-by-side, swipeable template preview page. Every card\n// renders its catalog template through miniMustache with the company's REAL\n// branding on a clearly-marked SAMPLE invoice, plus a tap-to-choose form.\n/*\n * miniMustache \u2014 a dependency-free Mustache subset, embedded verbatim into the\n * n8n invoice-render Code nodes (n8n has no template engine and its sandbox\n * has no module system, so mustache.js's UMD wrapper is a liability here).\n *\n * Supported syntax (exactly what backend/templates/invoice.html uses):\n *   {{name}}        HTML-escaped value from the context stack\n *   {{{name}}}      raw value (no escaping)\n *   {{#key}}...{{/key}}  section: array -> loop (empty array renders nothing),\n *                        truthy -> render once with the value pushed,\n *                        falsy/missing (0, '', null, undefined) -> skip\n *   {{^key}}...{{/key}}  inverted section: renders only when the value is\n *                        falsy or an empty array\n * Names may use dotted paths (a.b.c). Unknown names render as ''.\n *\n * Node test harness: `node backend/templates/mustache_mini.test.js`\n * (exports via CommonJS when available; a plain function otherwise).\n */\nfunction miniMustache(template, data) {\n  // HTML comments never reach the output \u2014 and this template's own header\n  // comment documents the syntax with literal {{...}} examples, so they must\n  // not be tokenized.\n  template = String(template).replace(/<!--[\\s\\S]*?-->/g, '');\n\n  // Escape map built without literal entity text in the source.\n  const AMP = String.fromCharCode(38);\n  const ENT = {\n    [String.fromCharCode(38)]: AMP + 'amp;',\n    [String.fromCharCode(60)]: AMP + 'lt;',\n    [String.fromCharCode(62)]: AMP + 'gt;',\n    [String.fromCharCode(34)]: AMP + 'quot;',\n    [String.fromCharCode(39)]: AMP + '#39;',\n  };\n  function escapeHtml(s) {\n    return String(s).replace(/[&<>\"']/g, (c) => ENT[c]);\n  }\n\n  function lookup(stack, name) {\n    const parts = name.split('.');\n    for (let i = stack.length - 1; i >= 0; i--) {\n      let v = stack[i];\n      let ok = true;\n      for (const p of parts) {\n        if (v == null || typeof v !== 'object' || !(p in v)) { ok = false; break; }\n        v = v[p];\n      }\n      if (ok) return v;\n    }\n    return undefined;\n  }\n\n  function isTruthy(v) {\n    if (Array.isArray(v)) return v.length > 0;\n    return Boolean(v);\n  }\n\n  // tokenize: walk the template, producing text / tag tokens\n  const tokens = [];\n  let i = 0;\n  while (i < template.length) {\n    const open = template.indexOf('{{', i);\n    if (open === -1) { tokens.push({ t: 'text', v: template.slice(i) }); break; }\n    if (open > i) tokens.push({ t: 'text', v: template.slice(i, open) });\n    let raw = false, inner;\n    if (template.slice(open, open + 3) === '{{{') {\n      const close = template.indexOf('}}}', open + 3);\n      if (close === -1) throw new Error('unterminated {{{ in template');\n      inner = template.slice(open + 3, close);\n      raw = true;\n      i = close + 3;\n    } else {\n      const close = template.indexOf('}}', open + 2);\n      if (close === -1) throw new Error('unterminated {{ in template');\n      inner = template.slice(open + 2, close);\n      i = close + 2;\n    }\n    const m = inner.match(/^\\s*(#|\\^|\\/)?\\s*([\\w.]+)\\s*$/);\n    if (!m) throw new Error('bad tag: ' + inner);\n    tokens.push({ t: m[1] || 'var', name: m[2], raw: raw });\n  }\n\n  // parse into a tree (sections nest)\n  function parse(start, end) {\n    const nodes = [];\n    let i = start;\n    while (i < end) {\n      const tok = tokens[i];\n      if (tok.t === 'text' || tok.t === 'var') { nodes.push(tok); i++; continue; }\n      if (tok.t === '/') throw new Error('unexpected {{/' + tok.name + '}}');\n      const close = tokens.findIndex((t, j) => j > i && t.t === '/' && t.name === tok.name);\n      if (close === -1 || close >= end) throw new Error('unclosed section {{' + tok.t + tok.name + '}}');\n      nodes.push({ t: tok.t, name: tok.name, body: parse(i + 1, close) });\n      i = close + 1;\n    }\n    return nodes;\n  }\n  const tree = parse(0, tokens.length);\n\n  function renderNodes(nodes, stack) {\n    let out = '';\n    for (const n of nodes) {\n      if (n.t === 'text') { out += n.v; continue; }\n      const v = lookup(stack, n.name);\n      if (n.t === 'var') {\n        const s = v == null ? '' : v;\n        out += n.raw ? String(s) : escapeHtml(s);\n      } else if (n.t === '#') {\n        if (Array.isArray(v)) {\n          for (const item of v) out += renderNodes(n.body, stack.concat([item]));\n        } else if (isTruthy(v)) {\n          out += renderNodes(n.body, stack.concat([v]));\n        }\n      } else if (n.t === '^') {\n        if (!isTruthy(v)) out += renderNodes(n.body, stack);\n      }\n    }\n    return out;\n  }\n\n  return renderNodes(tree, [data]);\n}\n\nif (typeof module !== 'undefined' && module.exports) {\n  module.exports = { render: miniMustache };\n}\n\nconst row = $input.first().json;\nconst crypto = require('crypto');\nconst money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\n// & = '&' itself, so the entities below can never be mangled in transit\nconst esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst gstRate = Number(row.gst_rate ?? 0.05);\nconst holdRate = Number(row.retention_rate ?? 0.1);\nconst net = 25000;\nconst dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);\nconst data = {\n  brand_primary_color: row.brand_primary_color || '#1a3a5c',\n  company_name: row.company_name || 'Ireh Construction',\n  company_address: [row.street_address, row.city, `${row.province ?? ''} ${row.postal_code ?? ''}`].filter(Boolean).join(', '),\n  company_phone: row.phone || '',\n  gst_reg_number: row.gst_reg_number || '',\n  pst_reg_number: row.pst_reg_number || '',\n  logo_data_uri: row.logo_data && row.logo_content_type ? `data:${row.logo_content_type};base64,${row.logo_data}` : '',\n  invoice_number: 'SAMPLE',\n  issued_date: new Date().toISOString().slice(0, 10),\n  due_date: dueDate,\n  invoice_type_label: 'Progress billing \u2014 25% of contract value (' + money(100000) + ')',\n  project_name: 'Sample Project',\n  bill_to_name: 'Sample Customer',\n  bill_to_address: '123 Sample Street<br>Vancouver, BC',\n  line_items: [{ position: 1, description: 'Progress billing \u2014 25% of contract value (' + money(100000) + ')', amount: money(net) }],\n  net_amount: money(net),\n  gst_label: 'GST',\n  gst_amount: money(net * gstRate),\n  pst_amount: 0,\n  amount_due: money(net * (1 + gstRate)),\n  holdback_amount: money(net * holdRate),\n  holdback_label: `Holdback (${Math.round(holdRate * 100)}% retained)`,\n  payment_instructions: (row.payment_instructions || '').split('\\n').filter((s) => s.trim().length > 0).join('<br>'),\n};\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst company = String(row.company_id ?? 1);\nconst exp = Math.floor(Date.now() / 1000) + 7 * 86400;\nconst sig = crypto.createHmac('sha256', secret).update(`${company}.template-choose.${exp}`).digest('base64url');\nconst chooseBase = `${base}/webhook/invoice-template-choose?company=${encodeURIComponent(company)}&exp=${exp}&sig=${encodeURIComponent(sig)}`;\nconst templates = Array.isArray(row.templates) ? row.templates : [];\nconst cards = templates.map((t) => {\n  const html = miniMustache(t.html || '', data);\n  const cur = (row.selected_key || 'classic') === t.key;\n  return `<section class=\"card${cur ? ' current' : ''}\">\n    <div class=\"card-head\">\n      <div><h2>${esc(t.display_name)}</h2><p>${esc(t.description || '')}</p></div>\n      ${cur ? '<span class=\"badge\">Current style</span>' : ''}\n    </div>\n    <div class=\"frame\"><iframe data-src=\"${esc(html)}\" title=\"${esc(t.display_name)}\"></iframe></div>\n    <form class=\"choose\" method=\"post\" action=\"${chooseBase}\">\n      <input type=\"hidden\" name=\"template\" value=\"${esc(t.key)}\">\n      <button type=\"submit\"${cur ? ' disabled' : ''}>${cur ? 'In use' : 'Use this style'}</button>\n    </form>\n  </section>`;\n}).join('');\nconst page = `<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Invoice styles \u2014 ${esc(data.company_name)}</title>\n<style>\n  :root { --brand: ${row.brand_primary_color || '#1a3a5c'}; }\n  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; margin: 0; background: #0f172a; color: #f8fafc; }\n  .head { padding: 18px 16px 10px; }\n  .head h1 { font-size: 20px; margin: 0 0 6px; }\n  .head p { color: #94a3b8; font-size: 13px; margin: 0; line-height: 1.5; }\n  .rail { display: flex; overflow-x: auto; scroll-snap-type: x mandatory;\n          gap: 14px; padding: 4px 16px 24px; -webkit-overflow-scrolling: touch; }\n  .card { flex: 0 0 86%; max-width: 400px; scroll-snap-align: center; background: #1e293b;\n           border-radius: 12px; padding: 12px; border: 1px solid #334155; }\n  .card.current { border-color: var(--brand); }\n  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; min-height: 52px; }\n  .card-head h2 { font-size: 16px; margin: 0; }\n  .card-head p { color: #94a3b8; font-size: 11px; margin: 4px 0 0; line-height: 1.4; }\n  .badge { background: var(--brand); color: #fff; font-size: 10px; border-radius: 999px;\n           padding: 4px 8px; white-space: nowrap; }\n  .frame { width: 100%; height: 560px; overflow: hidden; border-radius: 8px;\n           background: #fff; margin-top: 8px; }\n  .frame iframe { width: 800px; height: 1160px; border: 0; transform: scale(0.485);\n                  transform-origin: top left; }\n  .choose button { width: 100%; margin-top: 10px; padding: 12px; font-size: 15px; font-weight: 600;\n                    border: 0; border-radius: 8px; background: var(--brand); color: #fff; }\n  .choose button:disabled { background: #475569; }\n</style></head><body>\n<div class=\"head\">\n  <h1>Invoice styles</h1>\n  <p>Swipe to compare. Tap \"Use this style\" to switch \u2014 only NEW invoices change;\n     issued ones keep their original look. (Sample data with your real branding.)</p>\n</div>\n<div class=\"rail\">${cards}</div>\n<script>\n  // Lazy iframes: each card holds a COMPLETE invoice document (own CSS,\n  // own embedded logo). Rendering all three at once triples Chrome's document\n  // memory and got the backgrounded app killed on 4 GB phones. Load when the\n  // card is on screen, release when it scrolls fully away.\n  (function () {\n    var frames = Array.prototype.slice.call(document.querySelectorAll('iframe[data-src]'));\n    function load(f) {\n      if (!f.hasAttribute('srcdoc') && f.dataset.src) f.setAttribute('srcdoc', f.dataset.src);\n    }\n    if (!('IntersectionObserver' in window)) { frames.forEach(load); return; }\n    var io = new IntersectionObserver(function (entries) {\n      entries.forEach(function (e) {\n        if (e.isIntersecting) load(e.target);\n        else if (e.intersectionRatio === 0 && e.target.hasAttribute('srcdoc')) {\n          e.target.removeAttribute('srcdoc');\n          e.target.src = 'about:blank';\n        }\n      });\n    }, { threshold: 0.01, rootMargin: '0px 40px' });\n    frames.forEach(function (f) { io.observe(f); });\n  })();\n</script>\n</body></html>`;\nreturn [{ json: { html: page } }];\n"
-   },
-   "id": "tpl-0005",
-   "name": "Build Preview Page",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    880,
-    200
-   ]
-  },
-  {
-   "id": "tpl-0006",
-   "name": "Respond Preview Page",
-   "type": "n8n-nodes-base.respondToWebhook",
-   "typeVersion": 2,
-   "position": [
-    1100,
-    200
-   ],
-   "parameters": {
-    "respondWith": "text",
-    "responseBody": "={{ $json.html }}",
-    "options": {
-     "responseCode": 200,
-     "responseHeaders": {
-      "entries": [
-       {
-        "name": "Content-Type",
-        "value": "text/html; charset=utf-8"
-       }
+    {
+      "parameters": {
+        "jsCode": "// Verify the template-preview signature: `${company}.template-preview.${exp}`.\nconst crypto = require('crypto');\nconst q = $input.first().json.query || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst company = String(q.company || '');\nconst exp = String(q.exp || '');\nconst sig = String(q.sig || '');\nlet ok = false;\nif (secret && company && exp && sig) {\n  const expected = crypto.createHmac('sha256', secret).update(`${company}.template-preview.${exp}`).digest('base64url');\n  const a = Buffer.from(sig); const b = Buffer.from(expected);\n  if (a.length === b.length && crypto.timingSafeEqual(a, b) && Number(exp) * 1000 > Date.now()) ok = true;\n}\nreturn [{ json: { ok, company } }];\n"
+      },
+      "id": "tpl-0002",
+      "name": "Verify Preview Sig",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
       ]
-     }
-    }
-   }
-  },
-  {
-   "id": "tpl-0007",
-   "name": "Respond Preview Invalid",
-   "type": "n8n-nodes-base.respondToWebhook",
-   "typeVersion": 2,
-   "position": [
-    660,
-    420
-   ],
-   "parameters": {
-    "respondWith": "text",
-    "responseBody": "={{ $json.html }}",
-    "options": {
-     "responseCode": 400,
-     "responseHeaders": {
-      "entries": [
-       {
-        "name": "Content-Type",
-        "value": "text/html; charset=utf-8"
-       }
-      ]
-     }
-    }
-   }
-  },
-  {
-   "id": "tpl-0008",
-   "name": "Choose Webhook",
-   "type": "n8n-nodes-base.webhook",
-   "typeVersion": 2,
-   "position": [
-    0,
-    700
-   ],
-   "webhookId": "b2e4d1ef-0000-4a5b-9c1d-tplcho0001",
-   "parameters": {
-    "httpMethod": "POST",
-    "path": "invoice-template-choose",
-    "responseMode": "responseNode",
-    "options": {}
-   }
-  },
-  {
-   "parameters": {
-    "jsCode": "// Verify the template-choose signature: `${company}.template-choose.${exp}`.\n// template comes from the form body; company/exp/sig from the query string.\nconst crypto = require('crypto');\nconst j = $input.first().json;\nconst q = j.query || {};\nconst b = j.body || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst company = String(b.company ?? q.company ?? '');\nconst exp = String(b.exp ?? q.exp ?? '');\nconst sig = String(b.sig ?? q.sig ?? '');\nconst template = String(b.template || '');\nlet ok = false;\nif (secret && company && exp && sig && template) {\n  const expected = crypto.createHmac('sha256', secret).update(`${company}.template-choose.${exp}`).digest('base64url');\n  const a = Buffer.from(sig); const e = Buffer.from(expected);\n  if (a.length === e.length && crypto.timingSafeEqual(a, e) && Number(exp) * 1000 > Date.now()) ok = true;\n}\nreturn [{ json: { ok, company, template } }];\n"
-   },
-   "id": "tpl-0009",
-   "name": "Verify Choose Sig",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    220,
-    700
-   ]
-  },
-  {
-   "id": "tpl-0010",
-   "name": "Choose Sig OK?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2,
-   "position": [
-    440,
-    700
-   ],
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "loose",
-      "version": 2
-     },
-     "conditions": [
-      {
-       "id": "sig-ok",
-       "leftValue": "={{ $json.ok }}",
-       "rightValue": true,
-       "operator": {
-        "type": "boolean",
-        "operation": "equals"
-       }
+    },
+    {
+      "id": "tpl-0003",
+      "name": "Preview Sig OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "sig-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       }
-     ],
-     "combinator": "and"
     },
-    "options": {}
-   }
-  },
-  {
-   "parameters": {
-    "operation": "executeQuery",
-    "query": "WITH upd AS (\n  UPDATE company_profile cp\n     SET invoice_template_key = btrim($1), updated_at = now()\n   WHERE cp.id = $2::smallint\n     AND EXISTS (SELECT 1 FROM document_templates t WHERE t.key = btrim($1) AND t.is_active)\n  RETURNING cp.company_name, COALESCE(cp.invoice_template_key, 'classic') AS invoice_template\n)\nSELECT 'UPDATED' AS outcome, upd.company_name, upd.invoice_template AS template FROM upd\nUNION ALL\nSELECT 'INVALID_TEMPLATE', NULL, NULL WHERE NOT EXISTS (SELECT 1 FROM upd);",
-    "options": {
-     "queryReplacement": "={{ [$json.template, Number($json.company) || 1] }}"
-    }
-   },
-   "id": "tpl-0011",
-   "name": "Set Chosen Template",
-   "type": "n8n-nodes-base.postgres",
-   "typeVersion": 2.5,
-   "position": [
-    660,
-    600
-   ],
-   "credentials": {
-    "postgres": {
-     "id": "YOUR_POSTGRES_CREDENTIALS_ID",
-     "name": "Supabase PostgreSQL"
-    }
-   },
-   "alwaysOutputData": true
-  },
-  {
-   "parameters": {
-    "jsCode": "// Confirmation page after a tap-to-choose POST. Hands control back to the\n// app: an explicit \"Back to the app\" button (a click is always allowed) plus\n// a best-effort auto-redirect to the app scheme.\nconst r = $input.first().json || {};\n// Return-to-app: an Android intent URL goes to the installed app by package\n// + component (the app declares NO custom scheme). Chrome allows this from a\n// user tap; if the app is missing the browser falls back to S.browser_fallback_url.\nconst APP_RETURN = 'personalagent://app';  // declared in the app manifest\n// Fallback for phones still running the older apk (before the scheme existed):\n// a component intent launches the app by package+activity on any Chrome.\nconst APP_INTENT = 'intent://app#Intent;package=com.ordrnow.personal_agent_mobile;'\n  + 'component=com.ordrnow.personal_agent_mobile/.MainActivity;'\n  + 'S.browser_fallback_url=https%3A%2F%2Fn8n2.ordrnow.com%2F;end';\n// & = '&', so the entities can never be mangled in transit\nconst esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst ok = r.outcome === 'UPDATED';\nconst html = `<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Invoice style</title>\n<style>\n  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; background: #0f172a;\n         color: #f8fafc; display: flex; min-height: 100vh; align-items: center; justify-content: center; margin: 0; }\n  .box { background: #1e293b; padding: 26px 28px; border-radius: 12px; text-align: center; max-width: 420px; }\n  h1 { font-size: 20px; margin: 0 0 8px; }\n  p { color: #94a3b8; font-size: 14px; margin: 0 0 18px; line-height: 1.6; }\n  .note { color: #64748b; font-size: 11px; margin: 10px 0 0; }\n  .btn { display: inline-block; background: #2563eb; color: #fff; text-decoration: none;\n         padding: 12px 22px; border-radius: 8px; font-weight: 600; font-size: 15px; }\n</style></head><body><div class=\"box\">\n<h1>${ok ? 'Style set: ' + esc(r.template) : 'Unknown style'}</h1>\n<p>${ok\n  ? 'New invoices will use the ' + esc(r.template) + ' layout. Already-issued invoices keep their original look.'\n  : 'That style is not in the catalog. Go back and pick Classic, Modern or Compact.'}</p>\n<a class=\"btn\" id=\"backApp\" href=\"${APP_RETURN}\">Back to the app</a>\n<p class=\"note\">If the button does nothing, the app is not installed on this device.</p>\n</div>\n<script>\n  (function () {\n    var go = function (u) { try { window.location.href = u; } catch (e) {} };\n    var btn = document.getElementById('backApp');\n    if (btn) btn.addEventListener('click', function () {\n      // if the scheme opened nothing (old apk), fall back to the component intent\n      setTimeout(function () { if (!document.hidden) go(${JSON.stringify(APP_INTENT)}); }, 1200);\n    });\n    ${ok ? `// best-effort auto-return: scheme first, component intent second\n    setTimeout(function () { if (!document.hidden) go(${JSON.stringify(APP_RETURN)}); }, 1400);\n    setTimeout(function () { if (!document.hidden) go(${JSON.stringify(APP_INTENT)}); }, 3000);` : ''}\n  })();\n</script>\n</body></html>`;\nreturn [{ json: { html } }];\n"
-   },
-   "id": "tpl-0012",
-   "name": "Build Choice Page",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    880,
-    600
-   ]
-  },
-  {
-   "id": "tpl-0013",
-   "name": "Respond Choice Page",
-   "type": "n8n-nodes-base.respondToWebhook",
-   "typeVersion": 2,
-   "position": [
-    1100,
-    600
-   ],
-   "parameters": {
-    "respondWith": "text",
-    "responseBody": "={{ $json.html }}",
-    "options": {
-     "responseCode": 200,
-     "responseHeaders": {
-      "entries": [
-       {
-        "name": "Content-Type",
-        "value": "text/html; charset=utf-8"
-       }
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT cp.id AS company_id, cp.company_name, cp.street_address, cp.city,\n       cp.province, cp.postal_code, cp.phone, cp.gst_reg_number, cp.pst_reg_number,\n       cp.brand_primary_color, cp.logo_data, cp.logo_content_type,\n       cp.payment_instructions, cp.gst_rate, cp.retention_rate,\n       COALESCE(cp.invoice_template_key, 'classic') AS selected_key,\n       (SELECT json_agg(json_build_object('key', t.key, 'display_name', t.display_name,\n                        'description', t.description, 'html', t.html) ORDER BY t.key)\n          FROM document_templates t WHERE t.is_active) AS templates\n  FROM company_profile cp\n WHERE cp.id = $1::smallint;",
+        "options": {
+          "queryReplacement": "={{ [Number($json.company) || 1] }}"
+        }
+      },
+      "id": "tpl-0004",
+      "name": "Load Company + Catalog",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the side-by-side, swipeable template preview page. Every card\n// renders its catalog template through miniMustache with the company's REAL\n// branding on a clearly-marked SAMPLE invoice, plus a tap-to-choose form.\n/*\n * miniMustache — a dependency-free Mustache subset, embedded verbatim into the\n * n8n invoice-render Code nodes (n8n has no template engine and its sandbox\n * has no module system, so mustache.js's UMD wrapper is a liability here).\n *\n * Supported syntax (exactly what backend/templates/invoice.html uses):\n *   {{name}}        HTML-escaped value from the context stack\n *   {{{name}}}      raw value (no escaping)\n *   {{#key}}...{{/key}}  section: array -> loop (empty array renders nothing),\n *                        truthy -> render once with the value pushed,\n *                        falsy/missing (0, '', null, undefined) -> skip\n *   {{^key}}...{{/key}}  inverted section: renders only when the value is\n *                        falsy or an empty array\n * Names may use dotted paths (a.b.c). Unknown names render as ''.\n *\n * Node test harness: `node backend/templates/mustache_mini.test.js`\n * (exports via CommonJS when available; a plain function otherwise).\n */\nfunction miniMustache(template, data) {\n  // HTML comments never reach the output — and this template's own header\n  // comment documents the syntax with literal {{...}} examples, so they must\n  // not be tokenized.\n  template = String(template).replace(/<!--[\\s\\S]*?-->/g, '');\n\n  // Escape map built without literal entity text in the source.\n  const AMP = String.fromCharCode(38);\n  const ENT = {\n    [String.fromCharCode(38)]: AMP + 'amp;',\n    [String.fromCharCode(60)]: AMP + 'lt;',\n    [String.fromCharCode(62)]: AMP + 'gt;',\n    [String.fromCharCode(34)]: AMP + 'quot;',\n    [String.fromCharCode(39)]: AMP + '#39;',\n  };\n  function escapeHtml(s) {\n    return String(s).replace(/[&<>\"']/g, (c) => ENT[c]);\n  }\n\n  function lookup(stack, name) {\n    const parts = name.split('.');\n    for (let i = stack.length - 1; i >= 0; i--) {\n      let v = stack[i];\n      let ok = true;\n      for (const p of parts) {\n        if (v == null || typeof v !== 'object' || !(p in v)) { ok = false; break; }\n        v = v[p];\n      }\n      if (ok) return v;\n    }\n    return undefined;\n  }\n\n  function isTruthy(v) {\n    if (Array.isArray(v)) return v.length > 0;\n    return Boolean(v);\n  }\n\n  // tokenize: walk the template, producing text / tag tokens\n  const tokens = [];\n  let i = 0;\n  while (i < template.length) {\n    const open = template.indexOf('{{', i);\n    if (open === -1) { tokens.push({ t: 'text', v: template.slice(i) }); break; }\n    if (open > i) tokens.push({ t: 'text', v: template.slice(i, open) });\n    let raw = false, inner;\n    if (template.slice(open, open + 3) === '{{{') {\n      const close = template.indexOf('}}}', open + 3);\n      if (close === -1) throw new Error('unterminated {{{ in template');\n      inner = template.slice(open + 3, close);\n      raw = true;\n      i = close + 3;\n    } else {\n      const close = template.indexOf('}}', open + 2);\n      if (close === -1) throw new Error('unterminated {{ in template');\n      inner = template.slice(open + 2, close);\n      i = close + 2;\n    }\n    const m = inner.match(/^\\s*(#|\\^|\\/)?\\s*([\\w.]+)\\s*$/);\n    if (!m) throw new Error('bad tag: ' + inner);\n    tokens.push({ t: m[1] || 'var', name: m[2], raw: raw });\n  }\n\n  // parse into a tree (sections nest)\n  function parse(start, end) {\n    const nodes = [];\n    let i = start;\n    while (i < end) {\n      const tok = tokens[i];\n      if (tok.t === 'text' || tok.t === 'var') { nodes.push(tok); i++; continue; }\n      if (tok.t === '/') throw new Error('unexpected {{/' + tok.name + '}}');\n      const close = tokens.findIndex((t, j) => j > i && t.t === '/' && t.name === tok.name);\n      if (close === -1 || close >= end) throw new Error('unclosed section {{' + tok.t + tok.name + '}}');\n      nodes.push({ t: tok.t, name: tok.name, body: parse(i + 1, close) });\n      i = close + 1;\n    }\n    return nodes;\n  }\n  const tree = parse(0, tokens.length);\n\n  function renderNodes(nodes, stack) {\n    let out = '';\n    for (const n of nodes) {\n      if (n.t === 'text') { out += n.v; continue; }\n      const v = lookup(stack, n.name);\n      if (n.t === 'var') {\n        const s = v == null ? '' : v;\n        out += n.raw ? String(s) : escapeHtml(s);\n      } else if (n.t === '#') {\n        if (Array.isArray(v)) {\n          for (const item of v) out += renderNodes(n.body, stack.concat([item]));\n        } else if (isTruthy(v)) {\n          out += renderNodes(n.body, stack.concat([v]));\n        }\n      } else if (n.t === '^') {\n        if (!isTruthy(v)) out += renderNodes(n.body, stack);\n      }\n    }\n    return out;\n  }\n\n  return renderNodes(tree, [data]);\n}\n\nif (typeof module !== 'undefined' && module.exports) {\n  module.exports = { render: miniMustache };\n}\n\nconst row = $input.first().json;\nconst crypto = require('crypto');\nconst MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];\n// Calendar dates only: Y-M-D in, \"Oct 29, 2026\" out. No timezone maths - a date\n// column arrives as 00:00Z, and shifting it into local time prints the day before.\nconst fmtDate = (v) => {\n  if (v === null || v === undefined || v === '') return '';\n  const m = String(v).match(/^(\\d{4})-(\\d{2})-(\\d{2})/);\n  return m ? `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}` : String(v);\n};\nconst money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });\n// & = '&' itself, so the entities below can never be mangled in transit\nconst esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst gstRate = Number(row.gst_rate ?? 0.05);\nconst holdRate = Number(row.retention_rate ?? 0.1);\nconst net = 25000;\nconst dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);\nconst data = {\n  brand_primary_color: row.brand_primary_color || '#1a3a5c',\n  company_name: row.company_name || 'Ireh Construction',\n  company_address: [row.street_address, row.city, `${row.province ?? ''} ${row.postal_code ?? ''}`].filter(Boolean).join(', '),\n  company_phone: row.phone || '',\n  gst_reg_number: row.gst_reg_number || '',\n  pst_reg_number: row.pst_reg_number || '',\n  logo_data_uri: row.logo_data && row.logo_content_type ? `data:${row.logo_content_type};base64,${row.logo_data}` : '',\n  invoice_number: 'SAMPLE',\n  issued_date: fmtDate(new Date().toISOString()),\n  due_date: dueDate,\n  invoice_type_label: 'Progress billing — 25% of contract value (' + money(100000) + ')',\n  project_name: 'Sample Project',\n  bill_to_name: 'Sample Customer',\n  bill_to_address: '123 Sample Street<br>Vancouver, BC',\n  line_items: [{ position: 1, description: 'Progress billing — 25% of contract value (' + money(100000) + ')', amount: money(net) }],\n  net_amount: money(net),\n  gst_label: 'GST',\n  gst_amount: money(net * gstRate),\n  pst_amount: 0,\n  amount_due: money(net * (1 + gstRate)),\n  holdback_amount: money(net * holdRate),\n  holdback_label: `Holdback (${Math.round(holdRate * 100)}% retained)`,\n  payment_instructions: (row.payment_instructions || '').split('\\n').filter((s) => s.trim().length > 0).join('<br>'),\n};\nconst base = $env.PUBLIC_BASE_URL || 'https://n8n2.ordrnow.com';\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst company = String(row.company_id ?? 1);\nconst exp = Math.floor(Date.now() / 1000) + 7 * 86400;\nconst sig = crypto.createHmac('sha256', secret).update(`${company}.template-choose.${exp}`).digest('base64url');\nconst chooseBase = `${base}/webhook/invoice-template-choose?company=${encodeURIComponent(company)}&exp=${exp}&sig=${encodeURIComponent(sig)}`;\nconst templates = Array.isArray(row.templates) ? row.templates : [];\nconst cards = templates.map((t) => {\n  const html = miniMustache(t.html || '', data);\n  const cur = (row.selected_key || 'classic') === t.key;\n  return `<section class=\"card${cur ? ' current' : ''}\">\n    <div class=\"card-head\">\n      <div><h2>${esc(t.display_name)}</h2><p>${esc(t.description || '')}</p></div>\n      ${cur ? '<span class=\"badge\">Current style</span>' : ''}\n    </div>\n    <div class=\"frame\"><iframe data-src=\"${esc(html)}\" title=\"${esc(t.display_name)}\"></iframe></div>\n    <form class=\"choose\" method=\"post\" action=\"${chooseBase}\">\n      <input type=\"hidden\" name=\"template\" value=\"${esc(t.key)}\">\n      <button type=\"submit\"${cur ? ' disabled' : ''}>${cur ? 'In use' : 'Use this style'}</button>\n    </form>\n  </section>`;\n}).join('');\nconst page = `<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Invoice styles — ${esc(data.company_name)}</title>\n<style>\n  :root { --brand: ${row.brand_primary_color || '#1a3a5c'}; }\n  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; margin: 0; background: #0f172a; color: #f8fafc; }\n  .head { padding: 18px 16px 10px; }\n  .head h1 { font-size: 20px; margin: 0 0 6px; }\n  .head p { color: #94a3b8; font-size: 13px; margin: 0; line-height: 1.5; }\n  .rail { display: flex; overflow-x: auto; scroll-snap-type: x mandatory;\n          gap: 14px; padding: 4px 16px 24px; -webkit-overflow-scrolling: touch; }\n  .card { flex: 0 0 86%; max-width: 400px; scroll-snap-align: center; background: #1e293b;\n           border-radius: 12px; padding: 12px; border: 1px solid #334155; }\n  .card.current { border-color: var(--brand); }\n  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; min-height: 52px; }\n  .card-head h2 { font-size: 16px; margin: 0; }\n  .card-head p { color: #94a3b8; font-size: 11px; margin: 4px 0 0; line-height: 1.4; }\n  .badge { background: var(--brand); color: #fff; font-size: 10px; border-radius: 999px;\n           padding: 4px 8px; white-space: nowrap; }\n  .frame { width: 100%; height: 560px; overflow: hidden; border-radius: 8px;\n           background: #fff; margin-top: 8px; }\n  .frame iframe { width: 800px; height: 1160px; border: 0; transform: scale(0.485);\n                  transform-origin: top left; }\n  .choose button { width: 100%; margin-top: 10px; padding: 12px; font-size: 15px; font-weight: 600;\n                    border: 0; border-radius: 8px; background: var(--brand); color: #fff; }\n  .choose button:disabled { background: #475569; }\n</style></head><body>\n<div class=\"head\">\n  <h1>Invoice styles</h1>\n  <p>Swipe to compare. Tap \"Use this style\" to switch — only NEW invoices change;\n     issued ones keep their original look. (Sample data with your real branding.)</p>\n</div>\n<div class=\"rail\">${cards}</div>\n<script>\n  // Lazy iframes: each card holds a COMPLETE invoice document (own CSS,\n  // own embedded logo). Rendering all three at once triples Chrome's document\n  // memory and got the backgrounded app killed on 4 GB phones. Load when the\n  // card is on screen, release when it scrolls fully away.\n  (function () {\n    var frames = Array.prototype.slice.call(document.querySelectorAll('iframe[data-src]'));\n    function load(f) {\n      if (!f.hasAttribute('srcdoc') && f.dataset.src) f.setAttribute('srcdoc', f.dataset.src);\n    }\n    if (!('IntersectionObserver' in window)) { frames.forEach(load); return; }\n    var io = new IntersectionObserver(function (entries) {\n      entries.forEach(function (e) {\n        if (e.isIntersecting) load(e.target);\n        else if (e.intersectionRatio === 0 && e.target.hasAttribute('srcdoc')) {\n          e.target.removeAttribute('srcdoc');\n          e.target.src = 'about:blank';\n        }\n      });\n    }, { threshold: 0.01, rootMargin: '0px 40px' });\n    frames.forEach(function (f) { io.observe(f); });\n  })();\n</script>\n</body></html>`;\nreturn [{ json: { html: page } }];\n"
+      },
+      "id": "tpl-0005",
+      "name": "Build Preview Page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        200
       ]
-     }
-    }
-   }
-  },
-  {
-   "id": "tpl-0014",
-   "name": "Respond Choose Invalid",
-   "type": "n8n-nodes-base.respondToWebhook",
-   "typeVersion": 2,
-   "position": [
-    660,
-    820
-   ],
-   "parameters": {
-    "respondWith": "text",
-    "responseBody": "={{ $json.html }}",
-    "options": {
-     "responseCode": 400,
-     "responseHeaders": {
-      "entries": [
-       {
-        "name": "Content-Type",
-        "value": "text/html; charset=utf-8"
-       }
+    },
+    {
+      "id": "tpl-0006",
+      "name": "Respond Preview Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        200
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "tpl-0007",
+      "name": "Respond Preview Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        660,
+        420
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "tpl-0008",
+      "name": "Choose Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        700
+      ],
+      "webhookId": "b2e4d1ef-0000-4a5b-9c1d-tplcho0001",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "invoice-template-choose",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify the template-choose signature: `${company}.template-choose.${exp}`.\n// template comes from the form body; company/exp/sig from the query string.\nconst crypto = require('crypto');\nconst j = $input.first().json;\nconst q = j.query || {};\nconst b = j.body || {};\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nconst company = String(b.company ?? q.company ?? '');\nconst exp = String(b.exp ?? q.exp ?? '');\nconst sig = String(b.sig ?? q.sig ?? '');\nconst template = String(b.template || '');\nlet ok = false;\nif (secret && company && exp && sig && template) {\n  const expected = crypto.createHmac('sha256', secret).update(`${company}.template-choose.${exp}`).digest('base64url');\n  const a = Buffer.from(sig); const e = Buffer.from(expected);\n  if (a.length === e.length && crypto.timingSafeEqual(a, e) && Number(exp) * 1000 > Date.now()) ok = true;\n}\nreturn [{ json: { ok, company, template } }];\n"
+      },
+      "id": "tpl-0009",
+      "name": "Verify Choose Sig",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        700
       ]
-     }
+    },
+    {
+      "id": "tpl-0010",
+      "name": "Choose Sig OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "sig-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH upd AS (\n  UPDATE company_profile cp\n     SET invoice_template_key = btrim($1), updated_at = now()\n   WHERE cp.id = $2::smallint\n     AND EXISTS (SELECT 1 FROM document_templates t WHERE t.key = btrim($1) AND t.is_active)\n  RETURNING cp.company_name, COALESCE(cp.invoice_template_key, 'classic') AS invoice_template\n)\nSELECT 'UPDATED' AS outcome, upd.company_name, upd.invoice_template AS template FROM upd\nUNION ALL\nSELECT 'INVALID_TEMPLATE', NULL, NULL WHERE NOT EXISTS (SELECT 1 FROM upd);",
+        "options": {
+          "queryReplacement": "={{ [$json.template, Number($json.company) || 1] }}"
+        }
+      },
+      "id": "tpl-0011",
+      "name": "Set Chosen Template",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        600
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Confirmation page after a tap-to-choose POST. Hands control back to the\n// app: an explicit \"Back to the app\" button (a click is always allowed) plus\n// a best-effort auto-redirect to the app scheme.\nconst r = $input.first().json || {};\n// Return-to-app: an Android intent URL goes to the installed app by package\n// + component (the app declares NO custom scheme). Chrome allows this from a\n// user tap; if the app is missing the browser falls back to S.browser_fallback_url.\nconst APP_RETURN = 'personalagent://app';  // declared in the app manifest\n// Fallback for phones still running the older apk (before the scheme existed):\n// a component intent launches the app by package+activity on any Chrome.\nconst APP_INTENT = 'intent://app#Intent;package=com.ordrnow.personal_agent_mobile;'\n  + 'component=com.ordrnow.personal_agent_mobile/.MainActivity;'\n  + 'S.browser_fallback_url=https%3A%2F%2Fn8n2.ordrnow.com%2F;end';\n// & = '&', so the entities can never be mangled in transit\nconst esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst ok = r.outcome === 'UPDATED';\nconst html = `<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Invoice style</title>\n<style>\n  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; background: #0f172a;\n         color: #f8fafc; display: flex; min-height: 100vh; align-items: center; justify-content: center; margin: 0; }\n  .box { background: #1e293b; padding: 26px 28px; border-radius: 12px; text-align: center; max-width: 420px; }\n  h1 { font-size: 20px; margin: 0 0 8px; }\n  p { color: #94a3b8; font-size: 14px; margin: 0 0 18px; line-height: 1.6; }\n  .note { color: #64748b; font-size: 11px; margin: 10px 0 0; }\n  .btn { display: inline-block; background: #2563eb; color: #fff; text-decoration: none;\n         padding: 12px 22px; border-radius: 8px; font-weight: 600; font-size: 15px; }\n</style></head><body><div class=\"box\">\n<h1>${ok ? 'Style set: ' + esc(r.template) : 'Unknown style'}</h1>\n<p>${ok\n  ? 'New invoices will use the ' + esc(r.template) + ' layout. Already-issued invoices keep their original look.'\n  : 'That style is not in the catalog. Go back and pick Classic, Modern or Compact.'}</p>\n<a class=\"btn\" id=\"backApp\" href=\"${APP_RETURN}\">Back to the app</a>\n<p class=\"note\">If the button does nothing, the app is not installed on this device.</p>\n</div>\n<script>\n  (function () {\n    var go = function (u) { try { window.location.href = u; } catch (e) {} };\n    var btn = document.getElementById('backApp');\n    if (btn) btn.addEventListener('click', function () {\n      // if the scheme opened nothing (old apk), fall back to the component intent\n      setTimeout(function () { if (!document.hidden) go(${JSON.stringify(APP_INTENT)}); }, 1200);\n    });\n    ${ok ? `// best-effort auto-return: scheme first, component intent second\n    setTimeout(function () { if (!document.hidden) go(${JSON.stringify(APP_RETURN)}); }, 1400);\n    setTimeout(function () { if (!document.hidden) go(${JSON.stringify(APP_INTENT)}); }, 3000);` : ''}\n  })();\n</script>\n</body></html>`;\nreturn [{ json: { html } }];\n"
+      },
+      "id": "tpl-0012",
+      "name": "Build Choice Page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        600
+      ]
+    },
+    {
+      "id": "tpl-0013",
+      "name": "Respond Choice Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        600
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "tpl-0014",
+      "name": "Respond Choose Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 2,
+      "position": [
+        660,
+        820
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
     }
-   }
+  ],
+  "connections": {
+    "Preview Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Preview Sig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Preview Sig": {
+      "main": [
+        [
+          {
+            "node": "Preview Sig OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preview Sig OK?": {
+      "main": [
+        [
+          {
+            "node": "Load Company + Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Preview Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Company + Catalog": {
+      "main": [
+        [
+          {
+            "node": "Build Preview Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Preview Page": {
+      "main": [
+        [
+          {
+            "node": "Respond Preview Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Choose Sig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Choose Sig": {
+      "main": [
+        [
+          {
+            "node": "Choose Sig OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Sig OK?": {
+      "main": [
+        [
+          {
+            "node": "Set Chosen Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Choose Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Chosen Template": {
+      "main": [
+        [
+          {
+            "node": "Build Choice Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Choice Page": {
+      "main": [
+        [
+          {
+            "node": "Respond Choice Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
   }
- ],
- "connections": {
-  "Preview Webhook": {
-   "main": [
-    [
-     {
-      "node": "Verify Preview Sig",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Verify Preview Sig": {
-   "main": [
-    [
-     {
-      "node": "Preview Sig OK?",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Preview Sig OK?": {
-   "main": [
-    [
-     {
-      "node": "Load Company + Catalog",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Respond Preview Invalid",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Load Company + Catalog": {
-   "main": [
-    [
-     {
-      "node": "Build Preview Page",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Build Preview Page": {
-   "main": [
-    [
-     {
-      "node": "Respond Preview Page",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Choose Webhook": {
-   "main": [
-    [
-     {
-      "node": "Verify Choose Sig",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Verify Choose Sig": {
-   "main": [
-    [
-     {
-      "node": "Choose Sig OK?",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Choose Sig OK?": {
-   "main": [
-    [
-     {
-      "node": "Set Chosen Template",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Respond Choose Invalid",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Set Chosen Template": {
-   "main": [
-    [
-     {
-      "node": "Build Choice Page",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Build Choice Page": {
-   "main": [
-    [
-     {
-      "node": "Respond Choice Page",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  }
- },
- "settings": {
-  "executionOrder": "v1"
- }
 }

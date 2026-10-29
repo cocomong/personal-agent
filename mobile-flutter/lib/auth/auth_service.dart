@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 import '../config.dart';
+import '../notifications/fcm_service.dart';
 import 'session_store.dart';
 
 /// Google sign-in -> n8n /webhook/auth/google -> session.
@@ -98,6 +99,9 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    // Drop this phone's push registration while the session still authorises it;
+    // otherwise a signed-out device keeps receiving the company's notifications.
+    await FcmService.instance.unregisterDevice();
     await _googleSignIn.signOut();
     await SessionStore.instance.clear();
   }

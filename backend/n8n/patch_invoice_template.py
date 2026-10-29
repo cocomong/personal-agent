@@ -42,6 +42,17 @@ TEMPLATE_LITERAL = json.dumps((TEMPLATES / "invoice.html").read_text())
 # --- data preparation (JS): maps the lookup row to the template's context.
 # Kept behavior-identical to the old inline builder, minus the HTML assembly. ---
 DATAPREP = r'''
+// Calendar dates arrive as a JS Date (a `date` column -> 00:00Z) and serialize to
+// a full ISO timestamp, which used to be printed verbatim on the invoice
+// ("2026-10-29T07:00:00.000Z"). Format from the Y-M-D prefix only: no timezone
+// maths, because shifting 00:00Z into local time would print the previous day.
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDate(v) {
+  if (v === null || v === undefined || v === '') return '';
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}` : String(v);
+}
+
 function buildInvoiceData(inv) {
   const money = (v) => Number(v ?? 0).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
   const typeMap = { 'DEPOSIT': 'Deposit', 'PROGRESS_BILLING': 'Progress billing',
@@ -89,8 +100,8 @@ function buildInvoiceData(inv) {
     logo_data_uri: inv?.logo_data && inv?.logo_content_type
       ? `data:${inv.logo_content_type};base64,${inv.logo_data}` : '',
     invoice_number: inv?.invoice_number ?? '',
-    issued_date: inv?.issued_date ?? '',
-    due_date: inv?.due_date ?? '',
+    issued_date: fmtDate(inv?.issued_date),
+    due_date: fmtDate(inv?.due_date),
     invoice_type_label: typeLabel,
     project_name: inv?.project_name ?? '',
     bill_to_name: (inv?.customer_name ?? '') +
@@ -161,9 +172,10 @@ def patch_render_node(wf: dict, name: str, new_js: str) -> str:
     if node is None:
         raise SystemExit(f"missing node: {name}")
     js = node["parameters"]["jsCode"]
-    # Idempotent: skip only when the jsCode carries THIS template revision
-    # AND the v2 selection logic (row template, embedded fallback).
-    if TEMPLATE_LITERAL in js and "invoice_template_html" in js:
+    # Idempotent: skip only when the jsCode carries THIS template revision,
+    # the v2 selection logic (row template, embedded fallback) AND the current
+    # data-prep (v3 formats dates; an older copy must be rewritten).
+    if TEMPLATE_LITERAL in js and "invoice_template_html" in js and "fmtDate(" in js:
         return "already"
     node["parameters"]["jsCode"] = new_js
     node_js_check(new_js, name)

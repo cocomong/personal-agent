@@ -1,0 +1,184 @@
+{
+  "id": "device-unregister-001",
+  "name": "Device Unregister (sign-out)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "device/unregister",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "unreg-0001",
+      "name": "Device Unregister Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "device-unregister"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Removing a device requires the session that owns it: the token in the body is\n// deleted only for the caller's user id, so one account cannot unregister\n// another account's phone.\nconst crypto = require('crypto');\nconst req = $input.first().json || {};\nconst headers = req.headers || {};\nconst body = req.body || {};\nconst token = String(headers['x-user-token'] || headers['X-User-Token'] || '').trim();\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nlet uid = '';\nif (token && secret) {\n  try {\n    const parts = token.split('.');\n    if (parts.length === 3 && parts[0] === 'v1') {\n      const expected = crypto.createHmac('sha256', secret).update(parts[1]).digest('base64url');\n      const a = Buffer.from(parts[2]);\n      const b = Buffer.from(expected);\n      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {\n        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());\n        if (payload.uid && payload.exp * 1000 > Date.now()) uid = String(payload.uid);\n      }\n    }\n  } catch (e) {\n    uid = '';\n  }\n}\nreturn [{ json: { uid, fcm_token: String(body.token || '').trim() } }];"
+      },
+      "id": "unreg-0002",
+      "name": "Verify Session Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "signed-in",
+              "leftValue": "={{ $json.uid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "unreg-0003",
+      "name": "Signed In?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Delete only this user's row for this token. Idempotent: 0 rows is a\n-- success (already gone, or it belonged to someone else and is left alone).\nWITH del AS (\n  DELETE FROM device_tokens\n   WHERE token = btrim($2::text)\n     AND user_id = NULLIF(btrim($1::text), '')::uuid\n  RETURNING 1\n)\nSELECT (SELECT count(*) FROM del) AS removed;",
+        "options": {
+          "queryReplacement": "={{ [$json.uid, $json.fcm_token] }}"
+        }
+      },
+      "id": "unreg-0004",
+      "name": "Exec: delete_device_token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, removed: Number($json.removed) } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "unreg-0005",
+      "name": "Respond Unregistered",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, removed: 0, error: 'AUTH_REQUIRED' } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "unreg-0006",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Device Unregister Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Session Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Session Token": {
+      "main": [
+        [
+          {
+            "node": "Signed In?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signed In?": {
+      "main": [
+        [
+          {
+            "node": "Exec: delete_device_token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exec: delete_device_token": {
+      "main": [
+        [
+          {
+            "node": "Respond Unregistered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

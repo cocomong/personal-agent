@@ -21,10 +21,65 @@
     },
     {
       "parameters": {
+        "jsCode": "// A device token belongs to the SIGNED-IN user, so pushes follow the account\n// and stop following it after sign-out. Same HMAC check as the hook/auth-me.\nconst crypto = require('crypto');\nconst req = $input.first().json || {};\nconst headers = req.headers || {};\nconst body = req.body || {};\nconst token = String(headers['x-user-token'] || headers['X-User-Token'] || '').trim();\nconst secret = $env.AUTH_TOKEN_SECRET || '';\nlet uid = '';\nif (token && secret) {\n  try {\n    const parts = token.split('.');\n    if (parts.length === 3 && parts[0] === 'v1') {\n      const expected = crypto.createHmac('sha256', secret).update(parts[1]).digest('base64url');\n      const a = Buffer.from(parts[2]);\n      const b = Buffer.from(expected);\n      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {\n        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());\n        if (payload.uid && payload.exp * 1000 > Date.now()) uid = String(payload.uid);\n      }\n    }\n  } catch (e) {\n    uid = '';\n  }\n}\nreturn [{ json: {\n  uid,\n  fcm_token: String(body.token || '').trim(),\n  platform: String(body.platform || 'android').trim() || 'android',\n  device_name: String(body.device_name || '').trim(),\n} }];"
+      },
+      "id": "dev-0005",
+      "name": "Verify Session Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "signed-in",
+              "leftValue": "={{ $json.uid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "has-fcm-token",
+              "leftValue": "={{ $json.fcm_token }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dev-0006",
+      "name": "Signed In With Token?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        740,
+        180
+      ]
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO device_tokens (token, platform, device_name) VALUES ($1, $2, $3) ON CONFLICT (token) DO UPDATE SET platform = EXCLUDED.platform, device_name = EXCLUDED.device_name, last_seen_at = CURRENT_TIMESTAMP;",
+        "query": "-- Register (or re-home) this phone for the caller. A user still mid-setup\n-- has no company: nothing to push yet, so no row is written.\n-- ON CONFLICT re-homes the token when the same phone signs in as someone else.\nWITH me AS (\n  SELECT id, company_id FROM users WHERE id = NULLIF(btrim($1::text), '')::uuid\n)\nINSERT INTO device_tokens (token, platform, device_name, user_id, company_id)\nSELECT btrim($2::text),\n       COALESCE(NULLIF(btrim($3::text), ''), 'android'),\n       NULLIF(btrim($4::text), ''),\n       me.id,\n       me.company_id\n  FROM me\n WHERE me.company_id IS NOT NULL\nON CONFLICT (token) DO UPDATE SET\n    platform     = EXCLUDED.platform,\n    device_name  = EXCLUDED.device_name,\n    user_id      = EXCLUDED.user_id,\n    company_id   = EXCLUDED.company_id,\n    last_seen_at = CURRENT_TIMESTAMP\nRETURNING company_id;",
         "options": {
-          "queryReplacement": "={{ [$json.body.token, $json.body.platform, $json.body.device_name] }}"
+          "queryReplacement": "={{ [$json.uid, $json.fcm_token, $json.platform, $json.device_name] }}"
         }
       },
       "id": "dev-0002",
@@ -32,41 +87,72 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        500,
-        300
+        960,
+        60
       ],
       "credentials": {
         "postgres": {
           "id": "YOUR_POSTGRES_CREDENTIALS_ID",
           "name": "Supabase PostgreSQL"
         }
-      }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Registered only when the caller already has a company (setup complete).\n// briefing_time is read for THAT company, never the legacy id = 1.\nconst row = $input.first()?.json || {};\nconst scope = $('Verify Session Token').first().json || {};\nconst registered = row.company_id !== undefined && row.company_id !== null;\nreturn [{ json: {\n  ok: true,\n  registered,\n  company_id: row.company_id ?? null,\n  user_id: scope.uid || null,\n  note: registered ? null : 'no company yet - register again after setup',\n} }];"
+      },
+      "id": "dev-0007",
+      "name": "Shape Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        60
+      ],
+      "alwaysOutputData": true
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT to_char(briefing_time, 'HH24:MI') AS briefing_time FROM company_profile WHERE id = 1;",
-        "options": {}
+        "query": "SELECT to_char(cp.briefing_time, 'HH24:MI') AS briefing_time\n  FROM company_profile cp\n WHERE cp.id = $1::smallint;",
+        "options": {
+          "queryReplacement": "={{ [$json.company_id] }}"
+        }
       },
       "id": "dev-0003",
       "name": "Exec: get_briefing_time",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        760,
-        300
+        1400,
+        60
       ],
       "credentials": {
         "postgres": {
           "id": "YOUR_POSTGRES_CREDENTIALS_ID",
           "name": "Supabase PostgreSQL"
         }
-      }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge the registration result with the company's briefing time.\nconst reg = $('Shape Response').first().json || {};\nconst bt = $input.first()?.json || {};\nreturn [{ json: {\n  status: 'ok',\n  ok: true,\n  registered: !!reg.registered,\n  company_id: reg.company_id ?? null,\n  user_id: reg.user_id ?? null,\n  note: reg.note ?? null,\n  briefing_time: bt.briefing_time ?? null,\n} }];"
+      },
+      "id": "dev-0008",
+      "name": "Merge Briefing Time",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1620,
+        60
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { status: 'ok', briefing_time: $json.briefing_time } }}",
+        "responseBody": "={{ $json }}",
         "options": {
           "responseCode": 200
         }
@@ -74,10 +160,27 @@
       "id": "dev-0004",
       "name": "Respond Device",
       "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
+      "typeVersion": 1.1,
       "position": [
-        1020,
-        300
+        1840,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'unauthorized', ok: false, registered: false, error: 'AUTH_REQUIRED' } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "dev-0009",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        320
       ]
     }
   ],
@@ -86,7 +189,36 @@
       "main": [
         [
           {
+            "node": "Verify Session Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Session Token": {
+      "main": [
+        [
+          {
+            "node": "Signed In With Token?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signed In With Token?": {
+      "main": [
+        [
+          {
             "node": "Exec: upsert_device_token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unauthorized",
             "type": "main",
             "index": 0
           }
@@ -94,6 +226,17 @@
       ]
     },
     "Exec: upsert_device_token": {
+      "main": [
+        [
+          {
+            "node": "Shape Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Response": {
       "main": [
         [
           {
@@ -105,6 +248,17 @@
       ]
     },
     "Exec: get_briefing_time": {
+      "main": [
+        [
+          {
+            "node": "Merge Briefing Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Briefing Time": {
       "main": [
         [
           {
