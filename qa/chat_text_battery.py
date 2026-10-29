@@ -213,12 +213,59 @@ class Case:
     honest: bool = False                             # must read like a not-found, with no money
 
 
+_ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+         "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+         "sixteen", "seventeen", "eighteen", "nineteen"]
+_TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
+         "eighty", "ninety"]
+
+
+def _spell_small(n: int) -> str:
+    """1..999 in words: 270 -> 'two hundred seventy'."""
+    if n < 20:
+        return _ONES[n]
+    if n < 100:
+        return _TENS[n // 10] + ((" " + _ONES[n % 10]) if n % 10 else "")
+    rest = n % 100
+    out = _ONES[n // 100] + " hundred"
+    return out + ((" " + _spell_small(rest)) if rest else "")
+
+
+def _spell(n: int) -> str:
+    """270000 -> 'two hundred seventy thousand' (the way a person says it)."""
+    if n < 1000:
+        return _spell_small(n)
+    parts = []
+    for value, name in ((10**9, "billion"), (10**6, "million"), (10**3, "thousand")):
+        if n >= value:
+            count, n = divmod(n, value)
+            parts.append(_spell_small(count) + " " + name)
+    if n:
+        parts.append(_spell_small(n))
+    return " ".join(parts)
+
+
 def _money_regex(digits: str) -> str:
-    """270000 -> a regex that matches how a person writes it: 270000, 270,000, $270,000."""
+    """270000 -> a regex that matches how a person writes OR says it.
+
+    Digits: 270000, 270,000, $270,000. Spoken: 'two hundred seventy thousand'
+    (also 'two hundred and seventy thousand', hyphenated or not). The assistant
+    often speaks amounts in the voice-friendly wording, so a digits-only
+    assertion cries wolf on a correct answer.
+    """
     clean = re.sub(r"\D", "", digits)
     if not clean:
         return r"\$\s?\d[\d,]*"
-    return r"\$?\s?" + re.sub(r"(?<=\d)(?=(\d{3})+$)", r"[,\\s]?", clean)
+    numeric = r"\$?\s?" + re.sub(r"(?<=\d)(?=(\d{3})+$)", r"[,\\s]?", clean)
+    spoken = ""
+    try:
+        words = _spell(int(clean))
+        # Flexible separators; "and" is optional after "hundred".
+        spoken = re.sub(r"\s+", r"[\\s-]+", words)
+        spoken = spoken.replace("hundred[\\s-]+", "hundred(?:[\\s-]+and)?[\\s-]+")
+    except Exception:
+        spoken = ""
+    return "(?:" + numeric + ("|" + spoken if spoken else "") + ")"
 
 
 def build_cases(fixtures: dict) -> list[Case]:
