@@ -32,3 +32,6 @@ notes
 # python bytecode
 __pycache__/
 *.pyc
+
+# Kotlin/Gradle build scratch (compiler session locks)
+mobile-flutter/android/.kotlin/
